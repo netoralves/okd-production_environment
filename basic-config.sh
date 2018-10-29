@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ "$(hostname -s)" != "SORENTO" ]; then
+if [ "$(hostname -s)" != "master" ]; then
     echo "Este script deve ser executado do host master"
     exit 1
 fi
@@ -10,12 +10,12 @@ if [ "$(whoami)" != "root" ]; then
     exit 1
 fi
 #VARIAVEIS
-MASTER="sorento.ocb.org.br"
-NODE1="tiguan.ocb.org.br"
-NODE2="outlander.ocb.org.br"
+MASTER="master.openshift.local"
+NODE1="node1.openshift.local"
+NODE2="node2.openshift.local"
 USER="okd"
 USER_PASS="okd@123"
-ROOT_PASS="!QAZxsw2"
+ROOT_PASS="master_root_password"
 
 #instalacao basica de pacotes para rodar o ansible
 yum update -y
