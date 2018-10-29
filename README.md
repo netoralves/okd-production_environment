@@ -615,7 +615,7 @@ Allocated resources:
 Events:         <none>
 ```
 
-### Visualizar os pods de um projeto especifico:
+### View PODs of a specific project
 
 ```
 [okd@master ~]$ oc get pods -n stage -o wide
@@ -629,7 +629,7 @@ jenkins-2-lvlz5             1/1       Running     0          3d
 sonarqube-1-4fzzl           1/1       Running     2          6d
 ```
 
-### Visualizar o status de um pod especifico
+### View status of a specific POD
 ```
 [okd@master ~]$ oc describe pod jenkins-2-lvlz5
 Name:           jenkins-2-lvlz5
@@ -740,5 +740,5 @@ oc new-project PROJECT
 ```
 
 ## Autor
-**Francisco Neto** - *Initial work* - [PurpleBooth](https://github.com/netoralves)
+**Francisco Neto** - *Initial work* - [Profile](https://github.com/netoralves)
 
