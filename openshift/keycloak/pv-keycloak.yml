@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+ name: keycloak
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+  - ReadWriteOnce
+  nfs:
+    path: /exports/keycloak
+    server: sorento.ocb.org.br
+  persistentVolumeReclaimPolicy: Retain
