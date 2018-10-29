@@ -1,0 +1,56 @@
+[OSEv3:children]
+masters
+nodes
+etcd
+nfs
+glusterfs_registry
+
+[nodes:vars]
+use_overlay2_driver=true
+docker_storage_device=/dev/sdb
+
+[OSEv3:vars]
+
+os_firewall_use_firewalld=True 
+ansible_ssh_user=okd
+ansible_become=true
+openshift_deployment_type=origin
+openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider'}]
+openshift_master_htpasswd_users={'admin':'$apr1$k8DpA9AD$igTcSD.sO6v95TDT8DVhA1', 'stage':'$apr1$k8DpA9AD$igTcSD.sO6v95TDT8DVhA1', 'integration':'$apr1$k8DpA9AD$igTcSD.sO6v95TDT8DVhA1'}
+openshift_master_default_subdomain=apps.openshift.local
+openshift_docker_insecure_registries=172.30.0.0/16
+
+#GlusterFS Registry
+openshift_hosted_registry_storage_kind=glusterfs
+openshift_hosted_registry_storage_volume_size=8Gi
+openshift_hosted_registry_selector='node-role.kubernetes.io/infra=true'
+
+openshift_enable_unsupported_configurations=True
+
+#OAB's etcd configuration variables
+openshift_hosted_etcd_storage_kind=nfs
+openshift_hosted_etcd_storage_nfs_options="*(rw,root_squash,sync,no_wdelay)"
+openshift_hosted_etcd_storage_nfs_directory=/exports/osev3-etcd
+openshift_hosted_etcd_storage_volume_name=etcd-vol2
+openshift_hosted_etcd_storage_access_modes=["ReadWriteOnce"]
+openshift_hosted_etcd_storage_volume_size=10Gi
+openshift_hosted_etcd_storage_labels={'storage': 'etcd'}
+
+[masters]
+master.openshift.local openshift_schedulable=true
+
+[etcd]
+master.openshift.local
+
+[glusterfs_registry]
+master.openshift.local glusterfs_devices='[ "/dev/sdc" ]'
+node1.openshift.local glusterfs_devices='[ "/dev/sdc" ]'
+node2.openshift.local glusterfs_devices='[ "/dev/sdc" ]'
+
+[nfs]
+master.openshift.local
+
+[nodes]
+master.openshift.local openshift_node_group_name='node-config-master-infra'
+node1.openshift.local openshift_node_group_name='node-config-compute'
+node2.openshift.local openshift_node_group_name='node-config-compute'
