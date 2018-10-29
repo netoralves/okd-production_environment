@@ -1,0 +1,7 @@
+DEVS={{ docker_storage_device }}
+VG=docker-vg
+STORAGE_DRIVER=overlay2
+DATA_SIZE=95%VG
+CONTAINER_ROOT_LV_NAME=docker-pool
+CONTAINER_ROOT_LV_MOUNT_PATH=/var/lib/docker
+CONTAINER_ROOT_LV_SIZE=100%FREE
