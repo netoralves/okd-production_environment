@@ -42,7 +42,7 @@ This procedure was realized with 3 hosts with CentOS 7.5 S.O with upgrade packag
 ```
 CentOS Linux release 7.5.1804 (Core)
 ```
-## Instalação
+## Installation
 
 Related playbooks are kept in the ansible/playbooks directory, and basically contain the following artifacts:
 
@@ -307,24 +307,24 @@ Disk identifier: 0x0005a746
            └─2075 /usr/bin/hyperkube kubelet --v=2 --address=0.0.0.0 --allow-privileged=true --anon...
 ```
 
-## Arquivos e diretorios de configuração
+## Configuration files and Directories
 
 ### Master
 ```
 /etc/origin/master
 ```
 
-* Principal arquivo de configuração do master
+* Main file of master configuration
 ```
 /etc/origin/master/master-config.yaml
 ```
 
-* Arquivo de usuario/senha
+* User/Pass file
 ```
 /etc/origin/master/htpasswd
 ```
 
-* Principal arquivo de configuracao do node
+* Main file of nodes configuration
 ```
 /etc/origin/node/node-config.yaml
 ```
@@ -341,7 +341,7 @@ Disk identifier: 0x0005a746
 system:admin
 ```
 
-* Acesso com usuario local
+* User local access
 ```
 [okd@master ~]$ oc login -u system:admin
 Logged into "https://master.openshift.local:8443" as "system:admin" using existing credentials.
