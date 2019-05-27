@@ -1,42 +1,47 @@
 # CI/CD - Pipelines
-Este é o diretório com as configurações das aplicações com Pipelines definidos.
+This is the configuration directory for pipelines apps
 
+# Procedure of pipeline deploy
 
-# Procedimento de implantação do Pipeline
-
-1. Copie da pasta templates um dos 2 templates configurados, de acordo com a arquitetura do seu aplicativo:
+1. Copy from directory defined templates according to your app architecture:
   * Maven
   * NodeJS
+  * lib archives
 
 ```
-# Copiar o conteudo do template maven para uma nova aplicação
-cp -Rpvf templates/template-maven NOME_APP
+# Copy the content from maven template to your new app
+cp -Rpvf templates/template-maven NEW_APP
 ```
 
-2. Substitua os campos "app" pelo nome da aplicação
+2. Replace the field  "@app@" by the app name
 ```
-# sed 's /app/NOME_APP/g app-pipeline.yaml
+# sed 's /@app/NEW_APP/g app-pipeline.yaml
 ```
 
-3. Implante o pipeline
+3. Replace the field "@git@" by the git repository (in the next future i update with a app test)
 ```
-cd NOME_APP
+# sed 's /@git@/http://github.com/app.git/g' app-pipeline.yaml
+```
+
+4. Deploy pipeline
+```
+cd NEW_APP
 ./deploy.sh
 ```
 
-## Observações:
+## COMENT:
 
-Para projetos que seguem o padrão archive de bibliotecas, confirmar se a configuração de repositório esta da seguinte forma:
+To project who follows the default libs archive, confirm if a configuration of repository is:
 
 ```
  <distributionManagement>
                 <repository>
                         <id>nexus</id>
-                        <url>http://nexus.somoscooperativismo.coop.br:8081/repository/maven-releases</url>
+                        <url>http://nexus.yourdomain.com:8081/repository/maven-releases</url>
                 </repository>
                 <snapshotRepository>
                         <id>nexus</id>
-                        <url>http://nexus.somoscooperativismo.coop.br:8081/repository/maven-snapshots</url>
+                        <url>http://nexus.yourdomain.com:8081/repository/maven-snapshots</url>
                 </snapshotRepository>
 </distributionManagement>
 ```

@@ -4,7 +4,7 @@ metadata:
   labels:
     app: cicd-pipeline
     role: jenkins-slave
-  name: jenkins-slaves-nodejs
+  name: jenkins-agent-nodejs
 data:
   nodejs-template: |-
     <org.csanchez.jenkins.plugins.kubernetes.PodTemplate>
@@ -32,9 +32,9 @@ data:
           <command></command>
           <args>${computer.jnlpmac} ${computer.name}</args>
           <ttyEnabled>false</ttyEnabled>
-          <resourceRequestCpu>200m</resourceRequestCpu>
-          <resourceRequestMemory>512Mi</resourceRequestMemory>
-          <resourceLimitCpu>2</resourceLimitCpu>
+          <resourceRequestCpu>400m</resourceRequestCpu>
+          <resourceRequestMemory>1024Mi</resourceRequestMemory>
+          <resourceLimitCpu>4</resourceLimitCpu>
           <resourceLimitMemory>4Gi</resourceLimitMemory>
           <envVars/>
         </org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
@@ -42,4 +42,10 @@ data:
       <envVars/>
       <annotations/>
       <imagePullSecrets/>
+      <envVars>
+        <org.csanchez.jenkins.plugins.kubernetes.PodEnvVar>
+          <key>TZ</key>
+          <value>America/Sao_Paulo</value>
+        </org.csanchez.jenkins.plugins.kubernetes.PodEnvVar>
+      </envVars>
     </org.csanchez.jenkins.plugins.kubernetes.PodTemplate>

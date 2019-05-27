@@ -1,6 +1,6 @@
 ---
 - name: Verify Connectivity
-  hosts: nodes
+  hosts: all
   gather_facts: no
   tasks:
     - name: "Test connectivity to machines."
