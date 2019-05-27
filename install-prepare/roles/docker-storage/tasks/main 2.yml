@@ -1,0 +1,41 @@
+---
+- block:
+  - name: Customize default /etc/sysconfig/docker-storage-setup
+    template:
+      src: docker-storage-setup
+      dest: /etc/sysconfig/docker-storage-setup
+      owner: root
+      group: root
+      mode: 0644
+    when: not use_overlay2_driver
+  - name: Customize /etc/sysconfig/docker-storage-setup using overlay2 storage driver
+    template:
+      src: docker-storage-setup-overlay2
+      dest: /etc/sysconfig/docker-storage-setup
+      owner: root
+      group: root
+      mode: 0644
+    when: use_overlay2_driver
+  - name: Verify existence of /dev/docker-vg/docker-pool
+    stat:
+      path: /dev/docker-vg/docker-pool
+    register: p
+  - name: Stop docker
+    service:
+      name: docker
+      state: stopped
+    when: p.stat.exists == False
+  - name: Remove loopback docker files
+    file:
+      dest: /var/lib/docker
+      state: absent
+    when: p.stat.exists == False
+  - name: Run docker-storage-setup
+    command: /usr/bin/docker-storage-setup
+    when: p.stat.exists == False
+  - name: Start and enable docker
+    service:
+      name: docker
+      state: started
+    when: p.stat.exists == False
+  when: docker_storage_device is defined
