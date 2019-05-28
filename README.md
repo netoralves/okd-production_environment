@@ -151,7 +151,7 @@ cd ../install-run/
 ```
 # Administration
 
-## User ang grant access table
+## User and grant access table
 
 ### Usuários do S.O
 Usuário | Descrição | Senha
@@ -663,5 +663,5 @@ https://bugzilla.redhat.com/show_bug.cgi?id=1663268
 
 
 ## Autor
-* **Francisco Neto** - *Initial work* - [PurpleBooth](https://github.com/netoralves)
+* **Francisco Neto** - *Initial work* - [GitHub](https://github.com/netoralves)
 
