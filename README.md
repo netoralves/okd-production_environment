@@ -10,16 +10,16 @@ Documentation of deploy based on bash scripts and playbooks.
 ### Inventory
 Hostname | IP Address | Function | Proc | Memory | Disk
 --- | --- | --- | --- | --- | ---
-MASTER1 | xxx.xxx.xxx.xxx | Master + NFS Server (etcd) + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-MASTER2 | xxx.xxx.xxx.xxx | Master + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-MASTER3 | xxx.xxx.xxx.xxx | Master + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-NODE1 | xxx.xxx.xxx.xxx | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-NODE2 | xxx.xxxx.xxx.xxx | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-NODE3 | xxx.xxx.xxx.xxx | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores |  16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-NODE4 | xxx.xxx.xxx.xxx | Compute Node + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-NODE5 | xxx.xxx.xxx.xxx | Compute Node + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
-LB1 | xxx.xxx.xxx.xxx | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
-LB2 | xxx.xxx.xxx.xxx | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
+MASTER1 | 192.168.0.12 | Master + NFS Server (etcd) + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+MASTER2 | 192.168.0.13 | Master + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+MASTER3 | 192.168.0.14 | Master + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE1 | 192.168.0.15 | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE2 | 192.168.0.16 | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE3 | 192.168.0.17 | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores |  16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE4 | 192.168.0.18 | Compute Node + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE5 | 192.168.0.19 | Compute Node + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+LB1 | 192.168.0.10 | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
+LB2 | 192.168.0.11 | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
 
 
 ### Topologia DNS
@@ -35,163 +35,47 @@ okd.yourdomain.com	  | xxx.xxx.xxx.xxx | VIP (keepalived) LB1 AND LB2
 ![](images/keepalived.png?raw=true)
 
 
-#### Config Files
-
-
-```
-[okd@LB1 ~]$ cat /etc/keepalived/keepalived.conf
-global_defs {
-router_id ovp_vrrp
-}
-
-vrrp_script haproxy_check {
-script "killall -0 haproxy"
-interval 2
-weight 2
-}
-
-vrrp_instance OKD_EXT {
-interface eth0
-
-virtual_router_id 51
-
-priority 100
-state MASTER
-virtual_ipaddress {
-10.1.0.111 dev eth0
-
-}
-track_script {
-haproxy_check
-}
-
-authentication {
-auth_type PASS
-auth_pass 956e4be6-94f8-42af-a595-d07dd537484a
-}
-}
-
-vrrp_instance OKD_INT {
-interface eth0
-
-virtual_router_id 52
-
-priority 100
-state MASTER
-virtual_ipaddress {
-10.1.0.112 dev eth0
-
-}
-track_script {
-haproxy_check
-}
-
-authentication {
-auth_type PASS
-auth_pass 956e4be6-94f8-42af-a595-d07dd537484a
-}
-}
-```
-
-```
-[okd@LB2 ~]$ cat /etc/keepalived/keepalived.conf
-global_defs {
-router_id ovp_vrrp
-}
-
-vrrp_script haproxy_check {
-script "killall -0 haproxy"
-interval 2
-weight 2
-}
-
-vrrp_instance OKD_EXT {
-interface eth0
-
-virtual_router_id 51
-
-priority 98
-state BACKUP
-virtual_ipaddress {
-10.1.0.111 dev eth0
-
-}
-track_script {
-haproxy_check
-}
-
-authentication {
-auth_type PASS
-auth_pass 956e4be6-94f8-42af-a595-d07dd537484a
-}
-}
-
-vrrp_instance OKD_INT {
-interface eth0
-
-virtual_router_id 52
-
-priority 98
-state BACKUP
-virtual_ipaddress {
-10.1.0.112 dev eth0
-
-}
-track_script {
-haproxy_check
-}
-
-authentication {
-auth_type PASS
-auth_pass 956e4be6-94f8-42af-a595-d07dd537484a
-}
-}
-```
-
 ### URLs
 URI | Descrição
 --- | ---
 https://okd.yourdomain.com:8443/console/ | Web Console UI
 https://console.cloudapps.yourdomain.com | Cluster Console
-https://grafana-openshift-monitoring.cloudapps.yourdomain.com | Dashboards - Monitoração
+https://grafana-openshift-monitoring.cloudapps.yourdomain.com | Dashboards - Monitor
 https://prometheus-k8s-openshift-monitoring.cloudapps.yourdomain.com | Datasource Dashboards
-https://console.cloudapps.yourdomain.com/status/all-namespaces | Visão geral da saude do cluster
-https://console.cloudapps.yourdomain.com/k8s/all-namespaces/events | Visão de todos os ultimos eventos registrados
-http://okd.yourdomain.com:9000				       | status do LB externo
-http://huracan.yourdomain.com:1936				       | status do router interno - huracan
-http://aventador.yourdomain.com:1936			       | status do router interno - aventador
-http://reventon.yourdomain.com:1936			       	       | status do router interno - reventon
+https://console.cloudapps.yourdomain.com/status/all-namespaces | Cluster Overview
+https://console.cloudapps.yourdomain.com/k8s/all-namespaces/events | Overview of last register events
+http://okd.yourdomain.com:9000				       | status of external LB
+http://node4.yourdomain.com:1936			       | status of internal router
+http://node5.yourdomain.com:1936			       | status of internal router
 
-## Pré Requisitos
-
-Este procedimento foi realizado em 10 hosts com Sistema Operacionao Centos7.5 com os pacotes mais atualizados para esta release.
+## Requirements
+Install procedure performed  on 10 hosts with S.O CentOS
 
 ```
 CentOS Linux release 7.6.1810 (Core)
 ```
-## Instalação
+## Installation
 
-Os playbooks relacionados são mantidos no diretório ansible/playbooks do projeto, e contem basicamente os seguintes
-artefatos:
+The related Playbooks was manented on ansible / playbooks project directory, and contains basically the following content:
 
-• Arquivo de configuração do ansible (ansible.cfg)
-• Um diretório de playbooks.
-• Arquivo de inventário(inventory.ini).
+• Ansible Configuration file (ansible.cfg)
+• A playbooks directory.
+• Inventory file (inventory.ini).
 
-1. Faça checkout do repositorio do diretorio /root
+1. Make checkout of this repository on root directory:
 ```
-git clone http://git.yourdomain.com/jenkins/OPENSHIFTORIGIN.git
+git clone https://github.com/netoralves/okd-production_environment.git
 ```
-Obs.: Caso seja necessário realize a instalação do pacote git para realizar o clone do repositório.
+Note: If it is necessary to install the git package to perform the repository clone.
 
-2. Execute o script basic_config.sh:
+2. Execute the basic_config.sh script:
 
-2.1. Valide as variaveis configuradas no cabeçalho do script:
-* Existe uma restrição para o script ser executado na maquina MASTER1(master) e o usuario de execução ser o root.
-* As variáveis devem ser validadas para o ambiente, segue modelo de configuração provisionado para o ambiente de HMLG e PRD:
+2.1. Validate the configured variables in the script header:
+* There is a restriction for the script to run on the MASTER1 machine (master) and the running user is root.
+* The variables must be validated for the environment, following the configuration model provisioned for the HMLG and PRD environment:
+
 
 ```
-	#VARIAVEIS
 	MASTER1="MASTER1"
 	MASTER2="MASTER2"
 	MASTER3="MASTER3"
@@ -200,195 +84,152 @@ Obs.: Caso seja necessário realize a instalação do pacote git para realizar o
 	NODE3_INFRA="NODE3"
 	NODE1_COMPUTE="NODE4"
 	NODE2_COMPUTE="NODE5"
-	LB1="MURCIELAGO"
-	LB2="MIURA"
+	LB1="LB1"
+	LB2="LB2"
 	USER="okd"
-	USER_PASS="*******"
-	ROOT_PASS="*******"
+	USER_PASS="password"
+	ROOT_PASS="password"
 	OPENSHIFT_PACKAGE="centos-release-openshift-origin311"
 ```
 
-1.2. Apos validar as variaveis execute o script, ele ira validar as seguintes configurações:
-* Criando um usuario local com privilegios de root que sera usado pelo ansible (become)
-* Criando um usuario em cada node com os mesmos privilegios
-* Copia a chave ssh entre os usuarios criado em todos os nos (para o master acessar sem senha)
-* Gera a chave ssh do usuario root (Que sera usada pelo playbook)
-* Atualiza os pacotes de todos os host do cluster
-* Instala o ansible no host master
+1.2. After validating the variables execute the script, it will validate the following configurations:
+  * Creating a local user with root privileges that will be used by ansible (become)
+  * Creating a user on each node with the same privileges
+  * Copy ssh key between users created in all nos (for master access without password)
+  * Generates the root user's ssh key (which will be used by the playbook)
+  * Updates the packages of all cluster hosts
+  * Install ansible on master host
 
 ```
     ./basic_config.sh
 ```
 
-3. Reinicie as 10 maquinas
+3. Restart the 10 machines.
 
 ```
 su - okd
 
-ssh murcielago sudo systemctl reboot
-ssh miura sudo systemctl reboot
-ssh urus sudo systemctl reboot
-ssh aventador sudo systemctl reboot
-ssh bravo sudo systemctl reboot
-ssh huracan sudo systemctl reboot
-ssh tiguan sudo systemctl reboot
-ssh outlander sudo systemctl reboot
-ssh reventon sudo systemctl reboot
-ssh sorento sudo systemctl reboot
+ssh lb1 sudo systemctl reboot
+ssh lb2 sudo systemctl reboot
+ssh master2 sudo systemctl reboot
+ssh master3 sudo systemctl reboot
+ssh node1 sudo systemctl reboot
+ssh node2 sudo systemctl reboot
+ssh node3 sudo systemctl reboot
+ssh node4 sudo systemctl reboot
+ssh node5 sudo systemctl reboot
+ssh master1 sudo systemctl reboot
 ```
 
-4. Validaçao de acesso aos hosts sem solicitacao de senha pelo usuario okd (com exceção do Load Balancer)
+4. Validation of access to hosts without password request by user okd (with the exception of Load Balancer)
 
 ``` 
-[okd@MASTER1 ~]$ ssh sorento
-[okd@MASTER1 ~]$ ssh urus
-[okd@MASTER1 ~]$ ssh bravo
-[okd@MASTER1 ~]$ ssh reventon
-[okd@MASTER1 ~]$ ssh aventador
-[okd@MASTER1 ~]$ ssh huracan
-[okd@MASTER1 ~]$ ssh tiguan
-[okd@MASTER1 ~]$ ssh outlander
+[okd@MASTER1 ~]$ ssh master2
+[okd@MASTER1 ~]$ ssh master3
+[okd@MASTER1 ~]$ ssh node1
+[okd@MASTER1 ~]$ ssh node2
+[okd@MASTER1 ~]$ ssh node3
+[okd@MASTER1 ~]$ ssh node4
+[okd@MASTER1 ~]$ ssh node5
 ```
 
-4.2. Verifique a versão do ansible
+4.2. verify the ansible version
 ```
 [okd@MASTER1 ~]$ ansible --version
 ansible 2.6.5
 ```
 
-5. Logue no host master e execute o seguinte comando:
+5. Access the host master to execute the follow command:
 
 ```
-ssh okd@sorento
+ssh okd@master1
 cd install-prepare/
-[okd@sorento install-run]$ ansible-playbook install-prepare.yml
+[okd@MASTER1 install-run]$ ansible-playbook install-prepare.yml
 
 cd ../install-run/
-[okd@sorento install-run]$ ./install-run.sh
+[okd@MASTER1 install-run]$ ./install-run.sh
 ```
-# Administração
+# Administration
 
-## Tabela de usuarios e privilegios de acesso
+## User ang grant access table
 
 ### Usuários do S.O
 Usuário | Descrição | Senha
 --- | --- | ---
-okd | Usuário com privilegios de root (sudo) | okd@123
-root | Super usuário			     | !QAZxsw2
+okd | user with root privilegies (sudo) | password
+root | root | password
 
-### Usuários do OKD
-Usuário | Descrição | Senha
+### OKD Users
+Users | Description | Password
 --- | --- | ---
-admin | Usuário com privilégios de administracao no cluster  | admin@123
-hmlg  | Usuário com privilégios de administração no projeto hmlg e visão do po CICD | hmlg@123
-prd   | Usuário com privilégios de administração no pro prd e visão do projeCD | prd@123
-integracao | Usuário com privilégios de administração no projeto cicd e visão do projeto hmlg | ocb@123
+admin | Admin Cluster  | admin@123
+hmlg  | Project admin: hmlg; Project view: cicd | hmlg@123
+prd   | Project admin: prd; Project view: cicd | prd@123
+integracao | Project admin: cicd; Project view: hmlg, prd | ocb@123
 
 
-## Política de expurgo das builds e deployments antigos
+## Prune policy builds and deployments
 
-* Apagar todas as implementações cuja configuração de implantação não existe mais, o status está completo ou com falha e a contagem de réplica é zero.
-* Por configuração de implantação, mantenha as últimas N implantações cujo status está completo e a contagem de réplica é zero. (padrão 5)
-* Por configuração de implantação, mantenha as últimas N implantações cujo status foi reprovado e a contagem de réplica é zero. (padrão 1)
+* Delete all deployments whose deployment configuration no longer exists, the status is complete or failed, and the replica count is zero.
+* By deployment configuration, keep the latest N deployments whose status is complete and the replica count is zero. (Default 5)
+* By deployment configuration, keep the latest N deployments whose status has been deprecated and the replica count is zero. (Default 1)
 
-1. Para o projeto CICD
- * Manter as 10 ultimas builds e deployments que foram completadas com sucesso, manter 1 que tenha apresentado falha e manter minimamente 60minutos uma build ou deployment caso atenda a um dos requisitos de expurgo citados anteriormente.
+1. To CICD Project
+* Keep the last 10 builds and deployments that have been successfully completed, keep 1 that has failed, and maintain a 60minute build or deployment minimum if it meets one of the purge requirements quoted above.
 ```
 [okd@MASTER1 ~]$ oc adm prune builds --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n cicd
 [okd@MASTER1 ~]$ oc adm prune deployments --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n cicd
 ```
 
-2. Para o projeto HMLG
- * Manter as 10 ultimas builds e deployments que foram completadas com sucesso, manter 1 que tenha apresentado falha e manter minimamente 60minutos uma build ou deployment caso atenda a um dos requisitos de expurgo citados anteriormente.
+2. To HMLG Project
+* Keep the last 10 builds and deployments that have been successfully completed, keep 1 that has failed, and maintain a build or deployment for at least 60 minutes if it meets one of the purge requirements listed above.
 ```
 [okd@MASTER1 ~]$ oc adm prune builds --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n hmlg
 [okd@MASTER1 ~]$ oc adm prune deployments --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n hmlg
 ```
 
-3. Limpeza das imagens
-
- * Manter até três revisões de tag e mantendo recursos (imagens, fluxos de imagens e pods) com menos de sessenta minutos e limpa toda imagem que excede os limites definidos.
+3. Images clean up
+* Keep up to three tag revisions and keep resources (images, image streams and pods) less than sixty minutes, and clean any image that exceeds the defined limits.
 ```
 [okd@MASTER1 ~]$ oc adm prune images --keep-tag-revisions=3 --keep-younger-than=60m --confirm
 [okd@MASTER1 ~]$ oc adm prune images --prune-over-size-limit --confirm
 ```
 
-4. Link para Download do vídeo de demonstração
+## Backup Policy
 
-![Vídeo de demonstração](movies/Como_verificar_disco_registry.mov?raw=true)
-
-## Politica de Backup
-
-A criação de um backup de todo o ambiente envolve a cópia de dados importantes para auxiliar na restauração no caso de instâncias com falha ou dados corrompidos. Depois que os backups forem criados, eles poderão ser restaurados em uma versão recém-instalada do componente relevante.
-
-No OKD, você pode fazer o backup, salvando o estado para armazenamento separado, no nível do cluster. O estado completo de um backup de ambiente inclui:
-
-     * Arquivos do cluster
-
-     * dados do etcd em cada master
-
-     * Objetos da API
-
-     * Armazenamento do registry
-
-     * Armazenamento de volumes
+Creating a full backup environment involves copying important data to assist in restoring in the event of failed instances or corrupted data. After backups are created, they can be restored in a newly installed version of the relevant component.
 
 
-Até esta etapa do projeto foi adotado o backup dos arquivos do cluster, foi desenvolvido e disponibilizado ![neste repositorio](backups/dia2Ops)
+On OKD, you can backup, saving the state for separate storage, at the cluster level. The complete state of an environment backup includes:
+
+      * Cluster files
+
+      * etcd data on each master
+
+      * API Objects
+
+      * Registry storage
+
+      * Storage of volumes
+
+In this example I took backup of the cluster files, it was developed and made available! [In this repository] (backups/day2Ops)
+
 
 * Para realização dos backups nos hosts diariamente, execute os scripts ![instala-script-master.sh](backups/dia2Ops/instala-script-master.sh) e ![instala-script-node.sh](backups/dia2Ops/instala-script-node.sh), conforme imagem abaixo:
+* For daily backups, run the scripts! [Install-script-master.sh] (backups/day2Ops/install-script-master.sh) and! [Install-script-node.sh] (backups/day2Ops/install-script-node.sh), as shown below:
 
 ![](images/instala-script-backup.png?raw=true)
 
 
-### IMPORTANTE 
+### IMPORTANT
 
-1. Os arquivos de backup estaram disponiveis no diretório /backup/HOSTNAME/HOSTNAME-DATA.tar.gz, é sugerido uma rotina de backup para a coleta destes arquivos.
+1. Backup files will be available in the /backup/HOSTNAME/HOSTNAME-DATA.tar.gz directory, a backup routine is suggested for collecting these files.
 
-2. O backup é iniciado as 03:05 todos os dias
+2. Backup starts at 03:05 every day
 
-3. É mantido no diretório /backup os ultimos 7 arquivos *.tar.gz os mais antigos são excluidos.
-
-## Atualizaçao do Certificado
-
-### *.cloudapps.yourdomain.com
-
-Para atualização do certificado *.cloudapps.yourdomain.com, deve ser adotado o seguinte tutorial:
-
-1. Acesse o host MASTER1 como usuario okd e substitua os arquivos do certificado no /home do usuario com os mesmos nomes conforme listado abaixo:
-
-```
-STAR_cloudapps_yourdomain_com.crt
-STAR_cloudapps_yourdomain_com.key
-intermediario.crt
-
-```
-
-Obs.: Caso faça a alteração dos nomes dos arquivos deve ser alterado o parametro no arquivo /etc/ansible/hosts:
-
-```
-openshift_hosted_router_certificate={"certfile": "/home/okd/STAR_cloudapps_yourdomain_com.crt", "keyfile": "/home/okd/STAR_cloudapps_yourdomain_com.key", "cafile": "/home/okd/intermediario.crt"}
-```
-
-2. Após a substituição, execute o playbook com o comando informado abaixo:
-
-ansible-playbook /usr/share/ansible/openshift-ansible/playbooks/redeploy-certificates.yml  
+3. The last 7 old * .tar.gz files are deleted in the / backup directory.
 
 
-### *.yourdomain.com
-
-Para substituição do certificado *.yourdomain.com dos frontends em produção que utilizam o dominio somoscooperativismo, siga o tutorial abaixo:
-
-1. Acesse a interface de gerenciamento do okd (https://okd.yourdomain.com:8443/); 
-2. Após o login acesse o projeto "Producao"; 
-3. No menu do lado esquerdo, acesse Applications > Routes; 
-4. Clique no nome da aplicação que deseja substituir o certificado; 
-5. Na tela da rota, clique no botão "Actions" localizado no lado direito e em seguida "edit"; 
-6. Substitua as extensões .crt e .key com o novo certificado conforme imagem abaixo:
-
-![](images/route.png?raw=true)
-
-7. Clique em "Save" para finalizar a alteração
 # Pontos de Atenção
 
 ## Paths para backup / Monitoração
@@ -401,8 +242,8 @@ Como pré requisito de todos os pods de infra e app persistentes, é necessario 
 ```
 [okd@MASTER1 ~]$ oc get pods -o wide -n infra-storage
 NAME                                           READY     STATUS    RESTARTS   AGE       IP             NODE        NOMINATED NODE
-glusterblock-registry-provisioner-dc-1-4kp45   1/1       Running   1          1d        10.129.0.212   urus        <none>
-glusterfs-registry-v6j4s                       1/1       Running   0          6h        10.1.0.197     huracan     <none>
+glusterblock-registry-provisioner-dc-1-4kp45   1/1       Running   1          1d        10.129.0.212   mas        <none>
+glusterfs-registry-v6j4s                       1/1       Running   0          6h        192.168.0.     huracan     <none>
 glusterfs-registry-v9mgr                       1/1       Running   0          6h        10.1.0.196     urus        <none>
 glusterfs-registry-xt58f                       1/1       Running   0          6h        10.1.0.198     aventador   <none>
 heketi-registry-1-7czl4                        1/1       Running   1          1d        10.128.1.230   sorento     <none>
