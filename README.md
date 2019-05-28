@@ -22,9 +22,9 @@ LB1 | 192.168.0.10 | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
 LB2 | 192.168.0.11 | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
 
 
-### Topologia DNS
+### DNS Topology
 
-Resolução de Nome 	  | 	IP 	    | Hosts
+Name 	  | 	IP 	    | Hosts
 --- 			  | 	--- 	    | ---
 master-okd.yourdomain.com | xxx.xxx.xxx.xxx | VIP (keepalived) LB1 AND LB2
 okd.yourdomain.com	  | xxx.xxx.xxx.xxx | VIP (keepalived) LB1 AND LB2
@@ -36,7 +36,7 @@ okd.yourdomain.com	  | xxx.xxx.xxx.xxx | VIP (keepalived) LB1 AND LB2
 
 
 ### URLs
-URI | Descrição
+URI | Description
 --- | ---
 https://okd.yourdomain.com:8443/console/ | Web Console UI
 https://console.cloudapps.yourdomain.com | Cluster Console
@@ -151,10 +151,10 @@ cd ../install-run/
 ```
 # Administration
 
-## User ang grant access table
+## User and grant access table
 
-### Usuários do S.O
-Usuário | Descrição | Senha
+### S.O users
+User | Description | Password
 --- | --- | ---
 okd | user with root privilegies (sudo) | password
 root | root | password
@@ -215,7 +215,7 @@ On OKD, you can backup, saving the state for separate storage, at the cluster le
 In this example I took backup of the cluster files, it was developed and made available! [In this repository] (backups/day2Ops)
 
 
-* Para realização dos backups nos hosts diariamente, execute os scripts ![instala-script-master.sh](backups/dia2Ops/instala-script-master.sh) e ![instala-script-node.sh](backups/dia2Ops/instala-script-node.sh), conforme imagem abaixo:
+* Execute this scripts ![install-script-master.sh](backups/dia2Ops/install-script-master.sh) and ![install-script-node.sh](backups/dia2Ops/install-script-node.sh), follow image below:
 * For daily backups, run the scripts! [Install-script-master.sh] (backups/day2Ops/install-script-master.sh) and! [Install-script-node.sh] (backups/day2Ops/install-script-node.sh).
 
 
@@ -306,7 +306,7 @@ master1.yourdomain.com:/opt/osev3-etcd/etcd-vol2 on /var/lib/origin/openshift.lo
 
 ![](images/loggins-es-data-master.png?raw=true)
 
-2. Partição GlusterFS
+2. GlusterFS partition
 ```
 [root@MASTER1 ~]# fdisk -l /dev/sdc
 
@@ -318,7 +318,7 @@ Sector size (logical/physical): 512 bytes / 4096 bytes
 I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Partição de imagens Docker
+3. Docker images partition
 ```
 [root@MASTER1 ~]# fdisk -l /dev/sdb
 
@@ -343,7 +343,7 @@ Disk identifier: 0x0005a746
 
 ### MASTER2
 
-1. Partição GlusterFS
+1. GlusterFS partition
 ```
 [root@MASTER2 ~]# fdisk -l /dev/sdc
 
@@ -353,7 +353,7 @@ Sector size (logical/physical): 512 bytes / 4096 bytes
 I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Partição de imagens Docker
+3. Docker images partition
 ```
 [root@MASTER2 ~]# fdisk -l /dev/sdb
 
@@ -378,7 +378,7 @@ Disk identifier: 0x0005a746
 
 ### NODE2
 
-1. Partição GlusterFS
+1. GlusterFS partition
 ```
 [root@NODE2 ~]# fdisk -l /dev/sdc
 
@@ -388,7 +388,7 @@ Sector size (logical/physical): 512 bytes / 4096 bytes
 I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Partição de imagens Docker
+3. Docker images partition
 ```
 [root@NODE2 ~]# fdisk -l /dev/sdb
 
@@ -413,7 +413,7 @@ Disk identifier: 0x0005a746
 
 ### NODE1
 
-1. Partição GlusterFS
+1. GlusterFS partition
 ```
 [root@NODE1 ~]# fdisk -l /dev/sdc
 
@@ -423,7 +423,7 @@ Sector size (logical/physical): 512 bytes / 4096 bytes
 I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Partição de imagens Docker
+3. Docker images partition
 ```
 [root@NODE1 ~]# fdisk -l /dev/sdb
 
@@ -448,7 +448,7 @@ Disk identifier: 0x0005a746
 
 ### NODE4
 
-1. Partição GlusterFS
+1. GlusterFS partition
 ```
 [root@NODE4 ~]# fdisk -l /dev/sdc
 
@@ -458,7 +458,7 @@ Sector size (logical/physical): 512 bytes / 4096 bytes
 I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Partição de imagens Docker
+3. Docker image partition
 ```
 [root@NODE4 ~]# fdisk -l /dev/sdb
 
@@ -483,7 +483,7 @@ Disk identifier: 0x0005a746
 
 ### NODE5
 
-1. Partição GlusterFS
+1. GlusterFS partition
 ```
 [root@NODE5 ~]# fdisk -l /dev/sdc
 
@@ -493,7 +493,7 @@ Sector size (logical/physical): 512 bytes / 4096 bytes
 I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Partição de imagens Docker
+3. Docker image partition
 ```
 [root@NODE5 ~]# fdisk -l /dev/sdb
 
@@ -518,7 +518,7 @@ Disk identifier: 0x0005a746
 
 ## Troubleshoot
 
-### Daemons do S.O
+### S.O Daemons
 
 ```
 [root@MASTER1 ~]# systemctl status origin-node.service
@@ -592,24 +592,24 @@ Disk identifier: 0x0005a746
            └─2075 /usr/bin/hyperkube kubelet --v=2 --address=0.0.0.0 --allow-privileged=true --anon...
 ```
 
-## Arquivos e diretorios de configuração
+## Configuration files and directories
 
 ### Master
 ```
 /etc/origin/master
 ```
 
-* Principal arquivo de configuração do master
+* Main file of master configuration
 ```
 /etc/origin/master/master-config.yaml
 ```
 
-* Arquivo de usuario/senha
+* User/Pass file
 ```
 /etc/origin/master/htpasswd
 ```
 
-* Principal arquivo de configuracao do node
+* Main file of node configuration
 ```
 /etc/origin/node/node-config.yaml
 ```
@@ -663,5 +663,5 @@ https://bugzilla.redhat.com/show_bug.cgi?id=1663268
 
 
 ## Autor
-* **Francisco Neto** - *Initial work* - [PurpleBooth](https://github.com/netoralves)
+* **Francisco Neto** - *Initial work* - [GitHub](https://github.com/netoralves)
 
