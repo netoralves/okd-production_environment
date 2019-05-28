@@ -215,7 +215,7 @@ On OKD, you can backup, saving the state for separate storage, at the cluster le
 In this example I took backup of the cluster files, it was developed and made available! [In this repository] (backups/day2Ops)
 
 
-* Execute this scripts ![install-script-master.sh](backups/dia2Ops/install-script-master.sh) and ![install-script-node.sh](backups/dia2Ops/install-script-node.sh), follow image below:
+* Execute this scripts ![install-script-master.sh](backups/day2Ops/install-script-master.sh) and ![install-script-node.sh](backups/day2Ops/install-script-node.sh), follow image below:
 * For daily backups, run the scripts! [Install-script-master.sh] (backups/day2Ops/install-script-master.sh) and! [Install-script-node.sh] (backups/day2Ops/install-script-node.sh).
 
 
