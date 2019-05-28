@@ -2,8 +2,10 @@
 masters
 nodes
 etcd
-nfs
+glusterfs
 glusterfs_registry
+nfs
+lb
 
 [nodes:vars]
 use_overlay2_driver=true
@@ -16,41 +18,124 @@ ansible_ssh_user=okd
 ansible_become=true
 openshift_deployment_type=origin
 openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider'}]
-openshift_master_htpasswd_users={'admin':'$apr1$k8DpA9AD$igTcSD.sO6v95TDT8DVhA1', 'stage':'$apr1$k8DpA9AD$igTcSD.sO6v95TDT8DVhA1', 'integration':'$apr1$k8DpA9AD$igTcSD.sO6v95TDT8DVhA1'}
-openshift_master_default_subdomain=apps.openshift.local
+openshift_master_htpasswd_users={'admin':'$apr1$WDgcHk2Q$c6N30KUOe0WxvBV5vtX3L0', 'hmlg':'$apr1$hfygchJh$WtJCPxqkhCk.qkt9YqkB/0', 'integracao':'$apr1$VBqVJFwu$lJyxYhiUIozTQnNxfcW1x1'}
+openshift_master_default_subdomain=cloudapps.yourdomain.com
 openshift_docker_insecure_registries=172.30.0.0/16
 
-#GlusterFS Registry
-openshift_hosted_registry_storage_kind=glusterfs
-openshift_hosted_registry_storage_volume_size=8Gi
+#LB
+openshift_master_cluster_method=native
+openshift_master_cluster_hostname=master-okd.yourdomain.com
+openshift_master_cluster_public_hostname=okd.yourdomain.com
+
+############################################################################################
+#GLUSTER
+############################################################################################
+openshift_hosted_registry_storage_kind=glusterfs 
+openshift_hosted_registry_storage_volume_size=15Gi
 openshift_hosted_registry_selector='node-role.kubernetes.io/infra=true'
 
-openshift_enable_unsupported_configurations=True
+openshift_metrics_install_metrics=True
+openshift_metrics_hawkular_nodeselector={"node-role.kubernetes.io/infra": "true"} 
+openshift_metrics_cassandra_nodeselector={"node-role.kubernetes.io/infra": "true"} 
+openshift_metrics_heapster_nodeselector={"node-role.kubernetes.io/infra": "true"} 
+openshift_metrics_storage_kind=dynamic
+openshift_metrics_storage_volume_size=10Gi
+openshift_metrics_cassandra_pvc_storage_class_name="glusterfs-registry-block" 
+
+openshift_logging_install_logging=True
+openshift_logging_kibana_nodeselector={"node-role.kubernetes.io/infra": "true"} 
+openshift_logging_curator_nodeselector={"node-role.kubernetes.io/infra": "true"} 
+openshift_logging_es_nodeselector={"node-role.kubernetes.io/infra": "true"} 
+openshift_logging_storage_kind=dynamic
+openshift_logging_es_pvc_size=10Gi                        
+openshift_logging_elasticsearch_storage_type=pvc              
+openshift_logging_es_pvc_storage_class_name="glusterfs-registry-block"       
+openshift_logging_es_memory_limit=4Gi
+
+openshift_storage_glusterfs_namespace=app-storage
+openshift_storage_glusterfs_storageclass=true
+openshift_storage_glusterfs_storageclass_default=false
+openshift_storage_glusterfs_block_deploy=true
+openshift_storage_glusterfs_block_host_vol_size=80
+openshift_storage_glusterfs_block_storageclass=true
+openshift_storage_glusterfs_block_storageclass_default=false
+
+openshift_storage_glusterfs_registry_namespace=infra-storage
+openshift_storage_glusterfs_registry_block_deploy=true
+openshift_storage_glusterfs_registry_block_host_vol_size=80
+openshift_storage_glusterfs_registry_block_storageclass=true
+openshift_storage_glusterfs_registry_block_storageclass_default=false
+
+openshift_master_dynamic_provisioning_enabled=true
+
+##############################################################################################
+
+#openshift_enable_unsupported_configurations=True
 
 #OAB's etcd configuration variables
 openshift_hosted_etcd_storage_kind=nfs
 openshift_hosted_etcd_storage_nfs_options="*(rw,root_squash,sync,no_wdelay)"
-openshift_hosted_etcd_storage_nfs_directory=/exports/osev3-etcd
+openshift_hosted_etcd_storage_nfs_directory=/opt/osev3-etcd
 openshift_hosted_etcd_storage_volume_name=etcd-vol2
 openshift_hosted_etcd_storage_access_modes=["ReadWriteOnce"]
-openshift_hosted_etcd_storage_volume_size=10Gi
+openshift_hosted_etcd_storage_volume_size=15Gi
 openshift_hosted_etcd_storage_labels={'storage': 'etcd'}
 
+#oreg_auth_user="docker"
+#oreg_auth_password="sescoop2018"
+#oreg_url=nexus.yourdomain.com:8082/openshift/origin-${component}:${version}
+#openshift_examples_modify_imagestreams=true
+#openshift_docker_additional_registries=docker.io,nexus.yourdomain.com:8082
+##openshift_docker_blocked_registries=registry.access.redhat.com
+
+#Image Prefixes Origin 3.10
+#openshift_web_console_prefix=nexus.yourdomain.com:8082/openshift/origin-
+#openshift_cockpit_deployer_prefix='nexus.yourdomain.com:8082/cockpit/'
+#openshift_service_catalog_image_prefix='nexus.yourdomain.com:8082/openshift/origin-'
+#template_service_broker_prefix="nexus.yourdomain.com:8082/openshift/origin-"
+#ansible_service_broker_image_prefix='nexus.yourdomain.com:8082/openshift/origin-'
+#ansible_service_broker_etcd_image_prefix=nexus.yourdomain.com:8082/quay.io/coreos/
+
 [masters]
-master.openshift.local openshift_schedulable=true
+master1
+master2
+master3
 
 [etcd]
-master.openshift.local
+node1
+node2
+node3
 
-[glusterfs_registry]
-master.openshift.local glusterfs_devices='[ "/dev/sdc" ]'
-node1.openshift.local glusterfs_devices='[ "/dev/sdc" ]'
-node2.openshift.local glusterfs_devices='[ "/dev/sdc" ]'
+[lb]
+lb1
+lb2
 
 [nfs]
-master.openshift.local
+master1
+
+[glusterfs]
+master1 glusterfs_devices='[ "/dev/sdc" ]'
+master2 glusterfs_devices='[ "/dev/sdc" ]'
+node1 glusterfs_devices='[ "/dev/sdc" ]'
+node2 glusterfs_devices='[ "/dev/sdc" ]'
+
+[glusterfs_registry]
+master3 glusterfs_devices='[ "/dev/sdc" ]'
+node3 glusterfs_devices='[ "/dev/sdc" ]'
+node4 glusterfs_devices='[ "/dev/sdc" ]'
+node5 glusterfs_devices='[ "/dev/sdc" ]'
 
 [nodes]
-master.openshift.local openshift_node_group_name='node-config-master-infra'
-node1.openshift.local openshift_node_group_name='node-config-compute'
-node2.openshift.local openshift_node_group_name='node-config-compute'
+#MASTERS
+master1 openshift_node_group_name='node-config-master'
+master2 openshift_node_group_name='node-config-master'
+master3 openshift_node_group_name='node-config-master'
+
+#COMPUTES
+node1 openshift_node_group_name='node-config-compute'
+node2 openshift_node_group_name='node-config-compute'
+
+#INFRAS
+node3 openshift_node_group_name='node-config-infra'
+node4 openshift_node_group_name='node-config-infra'
+node5 openshift_node_group_name='node-config-infra'

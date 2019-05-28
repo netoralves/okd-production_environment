@@ -1,14 +1,14 @@
 # CI/CD - SonarQube
-This is SonarQube configuration repository...
+Este é o diretório com as configurações do SonarQube..
 
 
-# Provision SonarQube POD
+# Provisionamento do POD SonarQube
 ```
 cd sonarqube/
-#Provision a persistence volume to storage DB file.
+#Provisionar um persistence volume para armazenamento do banco de dados
 ./configure_pv.sh
 
-#Provision
+#Provisionar o Jenkins
 ./deploy.sh
 
 ```

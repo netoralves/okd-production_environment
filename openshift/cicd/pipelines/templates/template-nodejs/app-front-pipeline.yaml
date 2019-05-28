@@ -1,0 +1,213 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: cicd
+  group: cicd
+metadata:
+  annotations:
+  name: cicd
+objects:
+# Pipeline
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    annotations:
+      pipeline.alpha.openshift.io/uses: '[{"name": "jenkins", "namespace": "", "kind": "DeploymentConfig"}]'
+    labels:
+      app: cicd-pipeline
+      name: cicd-pipeline
+    name: @app@-pipeline
+  spec:
+    triggers:
+      - type: "Generic"
+        generic:
+          secretReference:
+                name: "@app@"
+          allowEnv: true
+    runPolicy: Serial
+    source:
+      type: None
+    strategy:
+      jenkinsPipelineStrategy:
+        jenkinsfile: |-
+          pipeline {
+            agent {
+              node {
+                label 'nodejs'
+              }
+            }
+            stages {
+              stage( 'Gerando build maven' ) {
+                steps {
+                  git branch: 'hmlg', credentialsId: '4ecac623-a123-4aa6-ad2c-20e80fa36e41', url: '@git@'
+                    sh "npm cache clear --force && npm install --no-shrinkwrap --update-binary && npm run build"
+                }
+              }  
+              stage( 'Create image' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        return !openshift.selector("bc", "@app@").exists();
+                      }
+                    }
+                  }
+                }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.newBuild("--name=@app@", "--binary=true")
+                      }
+                    } 
+                  } 
+                }
+              } 
+              stage( 'Deploy build' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.selector("bc", "@app@").startBuild("--from-file='.'", "--wait=true")
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Promote tag' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.tag("@app@:latest", "@app@:hmlg")
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Deploy App' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        return !openshift.selector('dc', '@app@').exists()
+                      }
+                    }
+                  }
+                }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.newApp('@app@:hmlg')
+                        sh """
+                          oc expose svc @app@ --hostname=@app@-hmlg.cloudapps.yourdomain.com --path=/ -n hmlg
+                        """
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Promote tag to PRD?' ) {
+                steps {
+                  timeout(time:240, unit:'MINUTES') {
+                    input message: "Promover para PRD?", ok: "Promover"
+                  }
+                }
+              }
+              stage( 'Execute merge - branch master' ) {
+                steps {
+                  withCredentials([string(credentialsId: '41b1843b-e350-4ab8-8cb4-456c7965c1ef', variable: 'PW1')]){
+                    sh '''
+                      git clean -fd
+                      git config push.default simple
+                      git checkout -f master
+                      git pull @git@ master
+                      git tag ${BUILD_ID}`date +%Y%m%d`
+                      set +e
+                      git push @git@ ${BUILD_ID}`date +%Y%m%d`
+                      git merge hmlg
+                      sed -i "s/hmlg/prd/" Dockerfile
+                      git add .
+                      git commit -m "Atualizando Dockerfile pra PRD"
+                      git push @git@ master
+                    '''
+                  }
+                }
+              }
+              stage( 'Create image - PRD' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        return !openshift.selector("bc", "@app@").exists();
+                      }
+                    }
+                  }
+                }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        openshift.newBuild("--name=@app@", "--binary=true")
+                      }
+                    } 
+                  } 
+                }
+              } 
+              stage( 'Deploy build - PRD' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        sh "sed -i 's/hmlg/prd/' Dockerfile"
+                        openshift.selector("bc", "@app@").startBuild("--from-file='.'", "--wait=true")
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Promote tag - PRD' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        openshift.tag("@app@:latest", "@app@:prd")
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Deploy app - PRD' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        return !openshift.selector('dc', '@app@').exists()
+                      }
+                    }
+                  }
+                }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        openshift.newApp('@app@:prd')
+                        sh """
+                          oc expose svc @app@ --hostname=@app@-hmlg.cloudapps.yourdomain.com --path=/ -n prd
+                        """
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        type: JenkinsPipeline
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: @app@
+    creationTimestamp:
+  data:
+    WebHookSecretKey: YmQxZDI1YzZjZGNmZWM3ZA==

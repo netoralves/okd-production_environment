@@ -1,4 +1,0 @@
-- name: "Host Preparation: Docker tasks"
-  hosts: nodes
-  roles:
-    - docker-storage

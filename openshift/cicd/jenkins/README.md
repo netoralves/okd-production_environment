@@ -1,25 +1,24 @@
 # CI/CD - Jenkins
-This is CI/CD repository to jenkins Master, Jenkins Slave Maven and NodeJS.
+Este é o diretório com as configurações do Jenkins Master, Jenkins Slave Maven e NodeJS.
+
 
 # Jenkins Master
 ```
 cd master/
-#Provision a persistence volume to storage jenkins config
+#Provisionar um persistence volume para armazenamento do banco de dados
 ./configure_pv.sh
 
-#Provisio a Jenkins Master
+#Provisionar o Jenkins
 ./deploy.sh
 
 ```
 # Jenkins Slave - Maven
 
 ```
-#Provision a ConfigMap to Jenkins Slave Maven - (Kubernetes Plugin)
+#Provisionar o ConfigMap do jenkins Slave Maven
 cd maven/
-./configure_pv.sh
 ./deploy.sh
 ```
-Obs. This config use persistence volume to optimize deploy
 
 # Jenkins Slave - NodeJS
 ```

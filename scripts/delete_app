@@ -1,0 +1,9 @@
+#!/bin/bash
+
+NOME_APP=$1
+
+oc delete dc $NOME_APP
+oc delete bc $NOME_APP
+oc delete is $NOME_APP
+oc delete svc $NOME_APP
+oc delete route $NOME_APP

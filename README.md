@@ -1,182 +1,326 @@
-# Deploy of STAGE and PRD containers environment with OKD 3.10
-
-Automated Installation Procedure of OKD 3.10
+# Deploy the STAGE(HMLG) and PRD environment with OKD 3.11
+Documentation of deploy based on bash scripts and playbooks.
 
 ## Architecture
 
 ![](images/topologia2.png?raw=true)
 
+## Config Management
 
-```
-                              http://*.apps.openshift.local
-                                             |
---------------+------------------------------+---------------------------------+----------------
-              |10.211.55.100                       |10.211.55.101                          |10.211.55.102
-+-------------+--------------+      +--------------+--------------+      +--------------+------------+
-| [ master.openshift.local ] |      |   [ node1.openshift.local ] |      | [ node2.openshift.local ] |
-|       (Master Node)        |      |        (Compute Node)       |      |      (Compute Node)       |
-|       (Infra Node)         |      |                             |      |                           |
-|      (Compute Node)        |      |                             |      |                           |
-+----------------------------+      +-----------------------------+      +---------------------------+
+### Inventory
+Hostname | IP Address | Function | Proc | Memory | Disk
+--- | --- | --- | --- | --- | ---
+MASTER1 | 192.168.0.12 | Master + NFS Server (etcd) + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+MASTER2 | 192.168.0.13 | Master + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+MASTER3 | 192.168.0.14 | Master + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE1 | 192.168.0.15 | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE2 | 192.168.0.16 | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE3 | 192.168.0.17 | Infra Node + Gluster Server + Gluster Volume (infra-storage) | 8 Cores |  16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE4 | 192.168.0.18 | Compute Node + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+NODE5 | 192.168.0.19 | Compute Node + Gluster Server + Gluster Volume (app-storage) | 8 Cores | 16 GB | 60GB /dev/sda - S.O / 20GB /dev/sdb - Docker-storage / 80GB /dev/sdc - GlusterFS
+LB1 | 192.168.0.10 | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
+LB2 | 192.168.0.11 | Load Balancer | 8 Cores | 16 GB | 60GB /dev/sda - S.O
 
-```
 
-```
-================================================================================================
-          MASTER:		           NODE1:			      NODE2:
-8 Cores				   8 Cores			     8 Cores
-16 GB RAM			   16 GB RAM			     16 GB RAM
-60GB /dev/sda - S.O		   60GB /dev/sda - S.O 		     60GB /dev/sda - S.O
-20GB /dev/sdb - Docker-storage	   20GB /dev/sdb - Docker-storage    20GB /dev/sdb - Docker-storage
-10GB /dev/sdc - GlusterFS 	   10GB /dev/sdc - GlusterFS	     10GB /dev/sdc - GlusterFS
+### Topologia DNS
 
-Persistence Storage Registry: GlusterFS
-Persistence Storage etcd      : nfs
-================================================================================================
-```
+Resolução de Nome 	  | 	IP 	    | Hosts
+--- 			  | 	--- 	    | ---
+master-okd.yourdomain.com | xxx.xxx.xxx.xxx | VIP (keepalived) LB1 AND LB2
+okd.yourdomain.com	  | xxx.xxx.xxx.xxx | VIP (keepalived) LB1 AND LB2
+.cloudapps.yourdomain.com | xxx.xxx.xxx.xxx / xxx.xxx.xxx.xxx | NODE3 / NODE4
+
+### Keepalived
+
+![](images/keepalived.png?raw=true)
+
+
+### URLs
+URI | Descrição
+--- | ---
+https://okd.yourdomain.com:8443/console/ | Web Console UI
+https://console.cloudapps.yourdomain.com | Cluster Console
+https://grafana-openshift-monitoring.cloudapps.yourdomain.com | Dashboards - Monitor
+https://prometheus-k8s-openshift-monitoring.cloudapps.yourdomain.com | Datasource Dashboards
+https://console.cloudapps.yourdomain.com/status/all-namespaces | Cluster Overview
+https://console.cloudapps.yourdomain.com/k8s/all-namespaces/events | Overview of last register events
+http://okd.yourdomain.com:9000				       | status of external LB
+http://node4.yourdomain.com:1936			       | status of internal router
+http://node5.yourdomain.com:1936			       | status of internal router
 
 ## Requirements
-
-This procedure was realized with 3 hosts with CentOS 7.5 S.O with upgrade packages to this release
+Install procedure performed  on 10 hosts with S.O CentOS
 
 ```
-CentOS Linux release 7.5.1804 (Core)
+CentOS Linux release 7.6.1810 (Core)
 ```
 ## Installation
 
-Related playbooks are kept in the ansible/playbooks directory, and basically contain the following artifacts:
+The related Playbooks was manented on ansible / playbooks project directory, and contains basically the following content:
 
-• Ansible configuration file (ansible.cfg)
-• Playbooks directory.
+• Ansible Configuration file (ansible.cfg)
+• A playbooks directory.
 • Inventory file (inventory.ini).
 
-1. Make clone of repository to /root directory
-
-
+1. Make checkout of this repository on root directory:
+```
 git clone https://github.com/netoralves/okd-production_environment.git
+```
+Note: If it is necessary to install the git package to perform the repository clone.
 
-2. Execute basic_config.sh:
-  
-  1.1. Validate configured variables in script's header:
+2. Execute the basic_config.sh script:
 
-    * Exist a restriction to the script be executed in machine where that short hostname was master and execution user was root.
-    * The variables must be validated to their environment, next configuration template was provisioned to stage and production environment:
+2.1. Validate the configured variables in the script header:
+* There is a restriction for the script to run on the MASTER1 machine (master) and the running user is root.
+* The variables must be validated for the environment, following the configuration model provisioned for the HMLG and PRD environment:
 
 
-    #VARIAVEIS
-    MASTER="master.openshift.local"
-    NODE1="node1.openshift.local"
-    NODE2="node2.openshift.local"
-    USER=okd
-    USER_PASS="*****"
-    ROOT_PASS="*****"
-    
-    1.2. After validate the variables, execute the script, this will perform:
-    
-          * Create a local user with root grants that will used by ansible playbooks (become)
-          * Create a user each nodes with default grants
-          * Copy ssh key between all nodes.
-          * Update all O.S packages
-          * Install engine ansible on master host
-    
+```
+	MASTER1="MASTER1"
+	MASTER2="MASTER2"
+	MASTER3="MASTER3"
+	NODE1_INFRA="NODE1"
+	NODE2_INFRA="NODE2"
+	NODE3_INFRA="NODE3"
+	NODE1_COMPUTE="NODE4"
+	NODE2_COMPUTE="NODE5"
+	LB1="LB1"
+	LB2="LB2"
+	USER="okd"
+	USER_PASS="password"
+	ROOT_PASS="password"
+	OPENSHIFT_PACKAGE="centos-release-openshift-origin311"
+```
+
+1.2. After validating the variables execute the script, it will validate the following configurations:
+  * Creating a local user with root privileges that will be used by ansible (become)
+  * Creating a user on each node with the same privileges
+  * Copy ssh key between users created in all nos (for master access without password)
+  * Generates the root user's ssh key (which will be used by the playbook)
+  * Updates the packages of all cluster hosts
+  * Install ansible on master host
+
+```
     ./basic_config.sh
- 
+```
 
-3. Validate access on allhosts without password by okd user.
-    
-[okd@master ~]$ ssh node1
-[okd@master ~]$ ssh node2
-[okd@master ~]$ ssh master
-    
-    4.2. Verify the ansible version
-    	[okd@master ~]$ ansible --version
-        ansible 2.6.3
-        ...
- 
-4. Execute the playbook to prepare hosts
-ssh okd@master
+3. Restart the 10 machines.
+
+```
+su - okd
+
+ssh lb1 sudo systemctl reboot
+ssh lb2 sudo systemctl reboot
+ssh master2 sudo systemctl reboot
+ssh master3 sudo systemctl reboot
+ssh node1 sudo systemctl reboot
+ssh node2 sudo systemctl reboot
+ssh node3 sudo systemctl reboot
+ssh node4 sudo systemctl reboot
+ssh node5 sudo systemctl reboot
+ssh master1 sudo systemctl reboot
+```
+
+4. Validation of access to hosts without password request by user okd (with the exception of Load Balancer)
+
+``` 
+[okd@MASTER1 ~]$ ssh master2
+[okd@MASTER1 ~]$ ssh master3
+[okd@MASTER1 ~]$ ssh node1
+[okd@MASTER1 ~]$ ssh node2
+[okd@MASTER1 ~]$ ssh node3
+[okd@MASTER1 ~]$ ssh node4
+[okd@MASTER1 ~]$ ssh node5
+```
+
+4.2. verify the ansible version
+```
+[okd@MASTER1 ~]$ ansible --version
+ansible 2.6.5
+```
+
+5. Access the host master to execute the follow command:
+
+```
+ssh okd@master1
 cd install-prepare/
-[okd@master install-run]$ ansible-playbook install-prepare.yml
+[okd@MASTER1 install-run]$ ansible-playbook install-prepare.yml
 
-5. Execute okd cluster installation
 cd ../install-run/
-[okd@master install-run]$ ./install-run.sh
-
+[okd@MASTER1 install-run]$ ./install-run.sh
+```
 # Administration
 
-## Users and Grant access Table
+## User ang grant access table
 
-### Operating System
-User | Description | Password
----  |  ---                         | ---
-okd  | User with root grants (sudo) | *******
-root | Super user		    | *******
+### Usuários do S.O
+Usuário | Descrição | Senha
+--- | --- | ---
+okd | user with root privilegies (sudo) | password
+root | root | password
 
 ### OKD Users
-User | Description | Password
+Users | Description | Password
 --- | --- | ---
-admin | User with administration grants on cluster (cluster-admin)  | admin@123
-stage  | User with adminstration grants on stage project  and viewed grants on cicd project | stage@123
-integration | User with administration grants on cicd project and viewed grants on stage project | integration@123
-
-## Prune policy to olders builds and deployments
-
-* Delete all implementations whose configuration don't exist more, the status was completed or with fail and the replicas counter was zero.
-* By deployment configuration, keep the last N deployments whose status was completed and replicas counter was zero. (default 5)
-* By deployment configuration, keep the last N deployments whose status was fail and replicas counter was zero. (Default 1)
-
-1. To cicd project
- * Keep the 10 lasts builds and deployments who was completed with success, keep 1 was look fail and keep it during 60 minutes a build or deployment to prune.
-```
-[okd@master ~]$ oc adm prune builds --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n cicd
-[okd@master ~]$ oc adm prune deployments --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n cicd
-```
-
-2. To stage project
- * Keep the 10 lasts builds and deployments who was completed with success, keep 1 was look fail and keep it during 60 minutes a build or deployment to prune.
-```
-[okd@master ~]$ oc adm prune builds --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n stage
-[okd@master ~]$ oc adm prune deployments --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n stage
-```
-3. To prod project
- * Keep the 10 lasts builds and deployments who was completed with success, keep 1 was look fail and keep it during 60 minutes a build or deployment to prune.
-```
-[okd@master ~]$ oc adm prune builds --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n prod
-[okd@master ~]$ oc adm prune deployments --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n prod
-```
+admin | Admin Cluster  | admin@123
+hmlg  | Project admin: hmlg; Project view: cicd | hmlg@123
+prd   | Project admin: prd; Project view: cicd | prd@123
+integracao | Project admin: cicd; Project view: hmlg, prd | ocb@123
 
 
-## Paths to backup / Monitoring
+## Prune policy builds and deployments
 
-### Master
+* Delete all deployments whose deployment configuration no longer exists, the status is complete or failed, and the replica count is zero.
+* By deployment configuration, keep the latest N deployments whose status is complete and the replica count is zero. (Default 5)
+* By deployment configuration, keep the latest N deployments whose status has been deprecated and the replica count is zero. (Default 1)
 
-1. NFS Share Directory
+1. To CICD Project
+* Keep the last 10 builds and deployments that have been successfully completed, keep 1 that has failed, and maintain a 60minute build or deployment minimum if it meets one of the purge requirements quoted above.
 ```
-[okd@master exports]$ ls
-jenkins-data  keycloak  logging-es  logging-es-ops  metrics  registry  sonarqube-data
-[okd@master exports]$ pwd
-/exports
-```
-
-```
-[okd@master exports]$ cd /etc/exports.d/
-[okd@master exports.d]$ ls
-jenkins.exports  keycloak.exports  openshift-ansible.exports  sonarqube.exports
+[okd@MASTER1 ~]$ oc adm prune builds --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n cicd
+[okd@MASTER1 ~]$ oc adm prune deployments --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n cicd
 ```
 
-2. GlusterFS Partition
+2. To HMLG Project
+* Keep the last 10 builds and deployments that have been successfully completed, keep 1 that has failed, and maintain a build or deployment for at least 60 minutes if it meets one of the purge requirements listed above.
 ```
-[root@master ~]# fdisk -l /dev/sdc
+[okd@MASTER1 ~]$ oc adm prune builds --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n hmlg
+[okd@MASTER1 ~]$ oc adm prune deployments --orphans --keep-complete=10 --keep-failed=1 --keep-younger-than=60m --confirm -n hmlg
+```
 
-Disk /dev/sdc: 10.7 GB, 10737418240 bytes, 20971520 sectors
+3. Images clean up
+* Keep up to three tag revisions and keep resources (images, image streams and pods) less than sixty minutes, and clean any image that exceeds the defined limits.
+```
+[okd@MASTER1 ~]$ oc adm prune images --keep-tag-revisions=3 --keep-younger-than=60m --confirm
+[okd@MASTER1 ~]$ oc adm prune images --prune-over-size-limit --confirm
+```
+
+## Backup Policy
+
+Creating a full backup environment involves copying important data to assist in restoring in the event of failed instances or corrupted data. After backups are created, they can be restored in a newly installed version of the relevant component.
+
+
+On OKD, you can backup, saving the state for separate storage, at the cluster level. The complete state of an environment backup includes:
+
+      * Cluster files
+
+      * etcd data on each master
+
+      * API Objects
+
+      * Registry storage
+
+      * Storage of volumes
+
+In this example I took backup of the cluster files, it was developed and made available! [In this repository] (backups/day2Ops)
+
+
+* Para realização dos backups nos hosts diariamente, execute os scripts ![instala-script-master.sh](backups/dia2Ops/instala-script-master.sh) e ![instala-script-node.sh](backups/dia2Ops/instala-script-node.sh), conforme imagem abaixo:
+* For daily backups, run the scripts! [Install-script-master.sh] (backups/day2Ops/install-script-master.sh) and! [Install-script-node.sh] (backups/day2Ops/install-script-node.sh).
+
+
+### IMPORTANT
+
+1. Backup files will be available in the /backup/HOSTNAME/HOSTNAME-DATA.tar.gz directory, a backup routine is suggested for collecting these files.
+
+2. Backup starts at 03:05 every day
+
+3. The last 7 old * .tar.gz files are deleted in the / backup directory.
+
+
+### GlusterFS
+
+
+```
+[okd@MASTER1 ~]$ oc get pods -o wide -n infra-storage
+NAME                                           READY     STATUS    RESTARTS   AGE       IP             NODE        NOMINATED NODE
+glusterblock-registry-provisioner-dc-1-4kp45   1/1       Running   1          1d        10.129.0.212   master2        <none>
+glusterfs-registry-v6j4s                       1/1       Running   0          6h        192.168.0.13   master2     <none>
+glusterfs-registry-v9mgr                       1/1       Running   0          6h        192.168.0.15   node1       <none>
+glusterfs-registry-xt58f                       1/1       Running   0          6h        192.168.0.16   node2   <none>
+heketi-registry-1-7czl4                        1/1       Running   1          1d        10.128.1.230   node3     <none>
+[okd@MASTER1 ~]$ oc get pods -o wide -n app-storage
+NAME                                          READY     STATUS    RESTARTS   AGE       IP             NODE        NOMINATED NODE
+glusterblock-storage-provisioner-dc-1-xxpzn   1/1       Running   0          1d        10.129.0.217   master3        <none>
+glusterfs-storage-6scmz                       1/1       Running   0          6h        192.168.0.18   node4          <none>
+glusterfs-storage-cwt4v                       1/1       Running   0          6h        192.168.0.19   node5          <none>
+glusterfs-storage-t26rn                       1/1       Running   0          6h        10.1.0.146     master1        <none>
+heketi-storage-1-7fwsh                        1/1       Running   18         36d       192.168.0.12   master1        <none>
+[okd@MASTER1 ~]$ oc get events -n infra-storage
+No resources found.
+[okd@MASTER1 ~]$ oc get events -n app-storage
+No resources found.
+[okd@MASTER1 ~]$
+```
+
+![](images/infra-storage.png?raw=true)
+![](images/app-storage.png?raw=true)
+
+### Pipelines
+
+
+```
+[okd@MASTER1 ~]$ oc get pods -o wide -n cicd
+NAME              READY     STATUS    RESTARTS   AGE       IP             NODE        NOMINATED NODE
+jenkins-7-92n9p   1/1       Running   0          6h        10.128.2.228   node4        <none>
+maven-1-xkjvk	  1/1	    Running   0		 1m	   10.128.2.119	  master1      <none>
+```
+
+### MASTER1
+
+1. NFS share directory.
+```
+[root@MASTER1 ~]# showmount -e
+Export list for MASTER1:
+/opt/osev3-etcd/etcd-vol2 *
+/exports/logging-es-ops   *
+/exports/logging-es       *
+/exports/metrics          *
+/exports/registry         *
+```
+
+The only NFS share used is for persistent storage of elasticsearch-storage data, as listed below:
+
+```
+[okd@MASTER1 ~]$ oc get pods -o wide
+NAME                                      READY     STATUS      RESTARTS   AGE       IP             NODE        NOMINATED NODE
+logging-curator-1550633400-cr2zv          0/1       Completed   0          15h       10.129.3.176   huracan     <none>
+logging-es-data-master-w8kahjwo-3-t5pkl   2/2       Running     0          1d        10.131.0.187   aventador   <none>
+logging-fluentd-6jrlj                     1/1       Running     34         37d       10.131.0.177   aventador   <none>
+logging-fluentd-9dl5j                     1/1       Running     20         37d       10.130.0.23    tiguan      <none>
+logging-fluentd-j94p4                     1/1       Running     2          1d        10.128.1.229   sorento     <none>
+logging-fluentd-n8nv9                     1/1       Running     21         39d       10.128.2.225   outlander   <none>
+logging-fluentd-pf6zt                     1/1       Running     21         36d       10.129.3.172   huracan     <none>
+logging-fluentd-zjpq5                     1/1       Running     29         1d        10.129.0.216   urus        <none>
+logging-kibana-1-qxgwp                    2/2       Running     0          1d        10.131.0.184   aventador   <none>
+
+[okd@MASTER1 ~]$ ssh node2
+Last login: Wed Feb 20 10:50:49 2019 from 10.0.10.82
+
+[okd@NODE2 ~]$ mount | grep nfs
+sunrpc on /var/lib/nfs/rpc_pipefs type rpc_pipefs (rw,relatime)
+master1.yourdomain.com:/opt/osev3-etcd/etcd-vol2 on /var/lib/origin/openshift.local.volumes/pods/a6869996-3446-11e9-b1a7-506b8d925c9c/volumes/kubernetes.io~nfs/etcd-vol2-volume type nfs4 (rw,relatime,vers=4.1,rsize=1048576,wsize=1048576,namlen=255,hard,proto=tcp,timeo=600,retrans=2,sec=sys,clientaddr=192.168.0.16,local_lock=none,addr=192.168.0.12)
+```
+
+![](images/pv.png?raw=true)
+
+![](images/loggins-es-data-master.png?raw=true)
+
+2. Partição GlusterFS
+```
+[root@MASTER1 ~]# fdisk -l /dev/sdc
+
+[root@MASTER1 ~]# fdisk -l /dev/sdc
+
+Disk /dev/sdc: 85.9 GB, 85899345920 bytes, 167772160 sectors
 Units = sectors of 1 * 512 = 512 bytes
-Sector size (logical/physical): 512 bytes / 512 bytes
-I/O size (minimum/optimal): 512 bytes / 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Docker-storage Partition
+3. Partição de imagens Docker
 ```
-[root@master ~]# fdisk -l /dev/sdb
+[root@MASTER1 ~]# fdisk -l /dev/sdb
 
 Disk /dev/sdb: 21.5 GB, 21474836480 bytes, 41943040 sectors
 Units = sectors of 1 * 512 = 512 bytes
@@ -188,30 +332,30 @@ Disk identifier: 0x0005a746
    Device Boot      Start         End      Blocks   Id  System
 /dev/sdb1            2048    41943039    20970496   8e  Linux LVM
 
-[root@master ~]# vgs docker-vg
+[root@MASTER1 ~]# vgs docker-vg
   VG        #PV #LV #SN Attr   VSize   VFree
   docker-vg   1   1   0 wz--n- <20.00g    0
 
-[root@master ~]# lvs /dev/docker-vg/docker-pool
+[root@MASTER1 ~]# lvs /dev/docker-vg/docker-pool
   LV          VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
   docker-pool docker-vg -wi-ao---- <20.00g
 ```
 
-### Node1
+### MASTER2
 
-1. GlusterFS Partition
+1. Partição GlusterFS
 ```
-[root@node1 ~]# fdisk -l /dev/sdc
+[root@MASTER2 ~]# fdisk -l /dev/sdc
 
-Disk /dev/sdc: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Disk /dev/sdc: 85.9 GB, 85899345920 bytes, 167772160 sectors
 Units = sectors of 1 * 512 = 512 bytes
-Sector size (logical/physical): 512 bytes / 512 bytes
-I/O size (minimum/optimal): 512 bytes / 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Docker-storage Partition
+3. Partição de imagens Docker
 ```
-[root@node1 ~]# fdisk -l /dev/sdb
+[root@MASTER2 ~]# fdisk -l /dev/sdb
 
 Disk /dev/sdb: 21.5 GB, 21474836480 bytes, 41943040 sectors
 Units = sectors of 1 * 512 = 512 bytes
@@ -223,30 +367,30 @@ Disk identifier: 0x0005a746
    Device Boot      Start         End      Blocks   Id  System
 /dev/sdb1            2048    41943039    20970496   8e  Linux LVM
 
-[root@node1 ~]# vgs docker-vg
+[root@MASTER2 ~]# vgs docker-vg
   VG        #PV #LV #SN Attr   VSize   VFree
   docker-vg   1   1   0 wz--n- <20.00g    0
 
-[root@node1 ~]# lvs /dev/docker-vg/docker-pool
+[root@MASTER2 ~]# lvs /dev/docker-vg/docker-pool
   LV          VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
   docker-pool docker-vg -wi-ao---- <20.00g
 ```
 
-### Node2
+### NODE2
 
-1. GlusterFS Partition
+1. Partição GlusterFS
 ```
-[root@node2 ~]# fdisk -l /dev/sdc
+[root@NODE2 ~]# fdisk -l /dev/sdc
 
-Disk /dev/sdc: 10.7 GB, 10737418240 bytes, 20971520 sectors
+Disk /dev/sdc: 85.9 GB, 85899345920 bytes, 167772160 sectors
 Units = sectors of 1 * 512 = 512 bytes
-Sector size (logical/physical): 512 bytes / 512 bytes
-I/O size (minimum/optimal): 512 bytes / 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
 ```
 
-3. Docker-storage Partition
+3. Partição de imagens Docker
 ```
-[root@node2 ~]# fdisk -l /dev/sdb
+[root@NODE2 ~]# fdisk -l /dev/sdb
 
 Disk /dev/sdb: 21.5 GB, 21474836480 bytes, 41943040 sectors
 Units = sectors of 1 * 512 = 512 bytes
@@ -258,21 +402,126 @@ Disk identifier: 0x0005a746
    Device Boot      Start         End      Blocks   Id  System
 /dev/sdb1            2048    41943039    20970496   8e  Linux LVM
 
-[root@node2 ~]# vgs docker-vg
+[root@NODE2 ~]# vgs docker-vg
   VG        #PV #LV #SN Attr   VSize   VFree
   docker-vg   1   1   0 wz--n- <20.00g    0
 
-[root@node2 ~]# lvs /dev/docker-vg/docker-pool
+[root@NODE2 ~]# lvs /dev/docker-vg/docker-pool
+  LV          VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  docker-pool docker-vg -wi-ao---- <20.00g
+```
+
+### NODE1
+
+1. Partição GlusterFS
+```
+[root@NODE1 ~]# fdisk -l /dev/sdc
+
+Disk /dev/sdc: 85.9 GB, 85899345920 bytes, 167772160 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
+```
+
+3. Partição de imagens Docker
+```
+[root@NODE1 ~]# fdisk -l /dev/sdb
+
+Disk /dev/sdb: 21.5 GB, 21474836480 bytes, 41943040 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x0005a746
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sdb1            2048    41943039    20970496   8e  Linux LVM
+
+[root@NODE1 ~]# vgs docker-vg
+  VG        #PV #LV #SN Attr   VSize   VFree
+  docker-vg   1   1   0 wz--n- <20.00g    0
+
+[root@NODE1 ~]# lvs /dev/docker-vg/docker-pool
+  LV          VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  docker-pool docker-vg -wi-ao---- <20.00g
+```
+
+### NODE4
+
+1. Partição GlusterFS
+```
+[root@NODE4 ~]# fdisk -l /dev/sdc
+
+Disk /dev/sdc: 85.9 GB, 85899345920 bytes, 167772160 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
+```
+
+3. Partição de imagens Docker
+```
+[root@NODE4 ~]# fdisk -l /dev/sdb
+
+Disk /dev/sdb: 21.5 GB, 21474836480 bytes, 41943040 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x0005a746
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sdb1            2048    41943039    20970496   8e  Linux LVM
+
+[root@NODE4 ~]# vgs docker-vg
+  VG        #PV #LV #SN Attr   VSize   VFree
+  docker-vg   1   1   0 wz--n- <20.00g    0
+
+[root@NODE4 ~]# lvs /dev/docker-vg/docker-pool
+  LV          VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  docker-pool docker-vg -wi-ao---- <20.00g
+```
+
+### NODE5
+
+1. Partição GlusterFS
+```
+[root@NODE5 ~]# fdisk -l /dev/sdc
+
+Disk /dev/sdc: 85.9 GB, 85899345920 bytes, 167772160 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 1048576 bytes
+```
+
+3. Partição de imagens Docker
+```
+[root@NODE5 ~]# fdisk -l /dev/sdb
+
+Disk /dev/sdb: 21.5 GB, 21474836480 bytes, 41943040 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x0005a746
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sdb1            2048    41943039    20970496   8e  Linux LVM
+
+[root@NODE5 ~]# vgs docker-vg
+  VG        #PV #LV #SN Attr   VSize   VFree
+  docker-vg   1   1   0 wz--n- <20.00g    0
+
+[root@NODE5 ~]# lvs /dev/docker-vg/docker-pool
   LV          VG        Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
   docker-pool docker-vg -wi-ao---- <20.00g
 ```
 
 ## Troubleshoot
 
-### Daemons
+### Daemons do S.O
 
 ```
-[root@master ~]# systemctl status origin-node.service
+[root@MASTER1 ~]# systemctl status origin-node.service
 ● origin-node.service - OpenShift Node
    Loaded: loaded (/etc/systemd/system/origin-node.service; enabled; vendor preset: disabled)
    Active: active (running) since Mon 2018-10-15 14:01:22 -03; 6 days ago
@@ -284,7 +533,43 @@ Disk identifier: 0x0005a746
 ```
 
 ```
-[root@node1 ~]# systemctl status origin-node.service
+[root@MASTER2 ~]# systemctl status origin-node.service
+● origin-node.service - OpenShift Node
+   Loaded: loaded (/etc/systemd/system/origin-node.service; enabled; vendor preset: disabled)
+   Active: active (running) since Mon 2018-10-15 14:01:22 -03; 6 days ago
+     Docs: https://github.com/openshift/origin
+ Main PID: 4173 (hyperkube)
+   Memory: 120.2M
+   CGroup: /system.slice/origin-node.service
+           └─4173 /usr/bin/hyperkube kubelet --v=2 --address=0.0.0.0 --allow-privileged=true --anonymous-auth=true --authentication-token-webhook=true --authentication-t...
+```
+
+```
+[root@NODE2 ~]# systemctl status origin-node.service
+● origin-node.service - OpenShift Node
+   Loaded: loaded (/etc/systemd/system/origin-node.service; enabled; vendor preset: disabled)
+   Active: active (running) since Mon 2018-10-15 14:01:22 -03; 6 days ago
+     Docs: https://github.com/openshift/origin
+ Main PID: 4173 (hyperkube)
+   Memory: 120.2M
+   CGroup: /system.slice/origin-node.service
+           └─4173 /usr/bin/hyperkube kubelet --v=2 --address=0.0.0.0 --allow-privileged=true --anonymous-auth=true --authentication-token-webhook=true --authentication-t...
+```
+
+```
+[root@NODE1 ~]# systemctl status origin-node.service
+● origin-node.service - OpenShift Node
+   Loaded: loaded (/etc/systemd/system/origin-node.service; enabled; vendor preset: disabled)
+   Active: active (running) since Mon 2018-10-15 14:01:22 -03; 6 days ago
+     Docs: https://github.com/openshift/origin
+ Main PID: 4173 (hyperkube)
+   Memory: 120.2M
+   CGroup: /system.slice/origin-node.service
+           └─4173 /usr/bin/hyperkube kubelet --v=2 --address=0.0.0.0 --allow-privileged=true --anonymous-auth=true --authentication-token-webhook=true --authentication-t...
+```
+
+```
+[root@NODE4 ~]# systemctl status origin-node.service
 ● origin-node.service - OpenShift Node
    Loaded: loaded (/etc/systemd/system/origin-node.service; enabled; vendor preset: disabled)
    Active: active (running) since Mon 2018-10-15 14:59:32 -03; 6 days ago
@@ -296,7 +581,7 @@ Disk identifier: 0x0005a746
 ```
 
 ```
-[root@node2 ~]# systemctl status origin-node.service
+[root@NODE5 ~]# systemctl status origin-node.service
 ● origin-node.service - OpenShift Node
    Loaded: loaded (/etc/systemd/system/origin-node.service; enabled; vendor preset: disabled)
    Active: active (running) since Mon 2018-10-15 15:18:42 -03; 6 days ago
@@ -307,24 +592,24 @@ Disk identifier: 0x0005a746
            └─2075 /usr/bin/hyperkube kubelet --v=2 --address=0.0.0.0 --allow-privileged=true --anon...
 ```
 
-## Configuration files and Directories
+## Arquivos e diretorios de configuração
 
 ### Master
 ```
 /etc/origin/master
 ```
 
-* Main file of master configuration
+* Principal arquivo de configuração do master
 ```
 /etc/origin/master/master-config.yaml
 ```
 
-* User/Pass file
+* Arquivo de usuario/senha
 ```
 /etc/origin/master/htpasswd
 ```
 
-* Main file of nodes configuration
+* Principal arquivo de configuracao do node
 ```
 /etc/origin/node/node-config.yaml
 ```
@@ -334,411 +619,49 @@ Disk identifier: 0x0005a746
 ```
 
 
-## oc Tools
+## How-To
+
+### How to expose the statistics of the internal routers to the browser?
+
+1. Access the default project:
+```
+[okd@MASTER1 ~]$ oc project default
+Already on project "default" on server "https://master-okd.yourdomain.com:8443".
+```
+2. List of pods with the -o wide option to see where node is hosted pod:
 
 ```
-[okd@master ~]$ oc whoami
-system:admin
+[okd@MASTER1 ~]$ oc get pods -o wide
+NAME                       READY     STATUS    RESTARTS   AGE       IP             NODE        NOMINATED NODE
+docker-registry-3-nrp8w    1/1       Running   0          15h       10.131.0.233   aventador   <none>
+registry-console-1-4wvrr   0/1       Evicted   0          43d       <none>         sorento     <none>
+registry-console-1-c2njf   1/1       Running   15         9d        10.129.1.21    urus        <none>
+router-3-pq6xl             1/1       Running   0          9m        10.1.0.197     huracan     <none>
+router-3-zfsht             1/1       Running   0          9m        10.1.0.198     aventador   <none>
 ```
+3. List of environment variables to see the user and password to login browser
+```
+[okd@MASTER1 ~]$ oc set env pod router-3-pq6xl --list | tail -n 6
+ROUTER_SERVICE_NAMESPACE=default
+ROUTER_SUBDOMAIN=
+ROUTER_THREADS=0
+STATS_PASSWORD=FTWwfZyZEz
+STATS_PORT=1936
+STATS_USERNAME=admin
+```
+4. Access via browser on nodes ![node4](http://node4:1936) ou ![node5](http://node5:1936):
+![](images/browser_auth_router.png?raw=true)
 
-* User local access
-```
-[okd@master ~]$ oc login -u system:admin
-Logged into "https://master.openshift.local:8443" as "system:admin" using existing credentials.
-
-You have access to the following projects and can switch between them with 'oc project <projectname>':
-
-  * cicd
-    default
-    stage
-    kube-public
-    kube-service-catalog
-    kube-system
-    management-infra
-    openshift
-    openshift-ansible-service-broker
-    openshift-infra
-    openshift-logging
-    openshift-node
-    openshift-sdn
-    openshift-template-service-broker
-    openshift-web-console
-    prod
-
-Using project "cicd".
-```
-
-* Remote Access
-
-![](images/login-externo.png?raw=true)
-
-Obs.: To install [oc tools](https://www.okd.io/download.html).
-
-```
-[okd@master ~]$ oc login
-Authentication required for https://master.openshift.local:8443 (openshift)
-Username: integration
-Password:
-Login successful.
-
-You have access to the following projects and can switch between them with 'oc project <projectname>':
-
-  * cicd
-    stage
-
-Using project "cicd".
-```
-
-```
-[okd@master ~]$ oc get nodes
-NAME        STATUS    ROLES          AGE       VERSION
-node2       Ready     compute        19d       v1.10.0+b81c8f8
-master      Ready     infra,master   19d       v1.10.0+b81c8f8
-node1       Ready     compute        19d       v1.10.0+b81c8f8
-```
-
-```
-[okd@master ~]$ oc describe node master
-Name:               master
-Roles:              infra,master
-Labels:             beta.kubernetes.io/arch=amd64
-                    beta.kubernetes.io/os=linux
-                    glusterfs=registry-host
-                    kubernetes.io/hostname=master
-                    node-role.kubernetes.io/infra=true
-                    node-role.kubernetes.io/master=true
-Annotations:        volumes.kubernetes.io/controller-managed-attach-detach=true
-CreationTimestamp:  Tue, 02 Oct 2018 15:36:37 -0300
-Taints:             <none>
-Unschedulable:      false
-Conditions:
-  Type             Status  LastHeartbeatTime                 LastTransitionTime                Reason                       Message
-  ----             ------  -----------------                 ------------------                ------                       -------
-  OutOfDisk        False   Mon, 22 Oct 2018 11:41:59 -0300   Tue, 02 Oct 2018 15:36:27 -0300   KubeletHasSufficientDisk     kubelet has sufficient disk space available
-  MemoryPressure   False   Mon, 22 Oct 2018 11:41:59 -0300   Tue, 02 Oct 2018 15:36:27 -0300   KubeletHasSufficientMemory   kubelet has sufficient memory available
-  DiskPressure     False   Mon, 22 Oct 2018 11:41:59 -0300   Tue, 02 Oct 2018 15:36:27 -0300   KubeletHasNoDiskPressure     kubelet has no disk pressure
-  PIDPressure      False   Mon, 22 Oct 2018 11:41:59 -0300   Tue, 02 Oct 2018 15:36:27 -0300   KubeletHasSufficientPID      kubelet has sufficient PID available
-  Ready            True    Mon, 22 Oct 2018 11:41:59 -0300   Tue, 02 Oct 2018 16:18:09 -0300   KubeletReady                 kubelet is posting ready status
-Addresses:
-  InternalIP:  10.211.55.100
-  Hostname:    master
-Capacity:
- cpu:            8
- hugepages-1Gi:  0
- hugepages-2Mi:  0
- memory:         16266716Ki
- pods:           250
-Allocatable:
- cpu:            8
- hugepages-1Gi:  0
- hugepages-2Mi:  0
- memory:         16164316Ki
- pods:           250
-System Info:
- Machine ID:                         eb49ea7961254dcf91b975c2336dd81c
- System UUID:                        423A2782-89E3-27EF-9F13-AC18572B90E2
- Boot ID:                            666abe90-9e60-4681-b6e4-f5a7a168bbc1
- Kernel Version:                     3.10.0-862.14.4.el7.x86_64
- OS Image:                           CentOS Linux 7 (Core)
- Operating System:                   linux
- Architecture:                       amd64
- Container Runtime Version:          docker://1.13.1
- Kubelet Version:                    v1.10.0+b81c8f8
- Kube-Proxy Version:                 v1.10.0+b81c8f8
-ExternalID:                          master
-Non-terminated Pods:                 (16 in total)
-  Namespace                          Name                          CPU Requests  CPU Limits  Memory Requests  Memory Limits
-  ---------                          ----                          ------------  ----------  ---------------  -------------
-  default                            docker-registry-1-nzq49       100m (1%)     0 (0%)      256Mi (1%)       0 (0%)
-  default                            glusterfs-registry-qsbnd      100m (1%)     0 (0%)      100Mi (0%)       0 (0%)
-  default                            registry-console-1-5hrkl      0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  default                            router-1-4plwt                100m (1%)     0 (0%)      256Mi (1%)       0 (0%)
-  kube-service-catalog               apiserver-hc7dl               0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  kube-service-catalog               controller-manager-q27dk      0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  kube-system                        master-api-master            0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  kube-system                        master-controllers-master    0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  kube-system                        master-etcd-master           0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-ansible-service-broker   asb-1-jt5b7                   0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-infra                    hawkular-metrics-zjvjx        0 (0%)        0 (0%)      1500M (9%)       2500M (15%)
-  openshift-node                     sync-mgpr9                    0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-sdn                      ovs-rjzqn                     100m (1%)     200m (2%)   300Mi (1%)       400Mi (2%)
-  openshift-sdn                      sdn-q5xwv                     100m (1%)     0 (0%)      200Mi (1%)       0 (0%)
-  openshift-template-service-broker  apiserver-66j8w               0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-web-console              webconsole-55c4d867f-4brvw    100m (1%)     0 (0%)      100Mi (0%)       0 (0%)
-Allocated resources:
-  (Total limits may be over 100 percent, i.e., overcommitted.)
-  CPU Requests  CPU Limits  Memory Requests   Memory Limits
-  ------------  ----------  ---------------   -------------
-  600m (7%)     200m (2%)   2770874112 (16%)  2919430400 (17%)
-Events:         <none>
-```
-
-```
-[okd@master ~]$ oc describe node node1
-Name:               node1
-Roles:              compute
-Labels:             beta.kubernetes.io/arch=amd64
-                    beta.kubernetes.io/os=linux
-                    glusterfs=registry-host
-                    kubernetes.io/hostname=node1
-                    node-role.kubernetes.io/compute=true
-Annotations:        volumes.kubernetes.io/controller-managed-attach-detach=true
-CreationTimestamp:  Tue, 02 Oct 2018 16:18:09 -0300
-Taints:             <none>
-Unschedulable:      false
-Conditions:
-  Type             Status  LastHeartbeatTime                 LastTransitionTime                Reason                       Message
-  ----             ------  -----------------                 ------------------                ------                       -------
-  OutOfDisk        False   Mon, 22 Oct 2018 11:43:12 -0300   Mon, 15 Oct 2018 14:59:32 -0300   KubeletHasSufficientDisk     kubelet has sufficient disk space available
-  MemoryPressure   False   Mon, 22 Oct 2018 11:43:12 -0300   Mon, 15 Oct 2018 14:59:32 -0300   KubeletHasSufficientMemory   kubelet has sufficient memory available
-  DiskPressure     False   Mon, 22 Oct 2018 11:43:12 -0300   Mon, 15 Oct 2018 14:59:32 -0300   KubeletHasNoDiskPressure     kubelet has no disk pressure
-  PIDPressure      False   Mon, 22 Oct 2018 11:43:12 -0300   Tue, 02 Oct 2018 16:18:09 -0300   KubeletHasSufficientPID      kubelet has sufficient PID available
-  Ready            True    Mon, 22 Oct 2018 11:43:12 -0300   Mon, 15 Oct 2018 14:59:42 -0300   KubeletReady                 kubelet is posting ready status
-Addresses:
-  InternalIP:  10.211.55.101
-  Hostname:    node1
-Capacity:
- cpu:            8
- hugepages-1Gi:  0
- hugepages-2Mi:  0
- memory:         16266716Ki
- pods:           250
-Allocatable:
- cpu:            8
- hugepages-1Gi:  0
- hugepages-2Mi:  0
- memory:         16164316Ki
- pods:           250
-System Info:
- Machine ID:                 9b67f9de3ee849e88f47bee0eb828b15
- System UUID:                423AB5CA-ABAA-8A80-9CAD-B7E844F0B669
- Boot ID:                    03882476-9317-429d-9aec-30fb5063d2d1
- Kernel Version:             3.10.0-862.14.4.el7.x86_64
- OS Image:                   CentOS Linux 7 (Core)
- Operating System:           linux
- Architecture:               amd64
- Container Runtime Version:  docker://1.13.1
- Kubelet Version:            v1.10.0+b81c8f8
- Kube-Proxy Version:         v1.10.0+b81c8f8
-ExternalID:                  node1
-Non-terminated Pods:         (10 in total)
-  Namespace                  Name                                            CPU Requests  CPU Limits  Memory Requests  Memory Limits
-  ---------                  ----                                            ------------  ----------  ---------------  -------------
-  cicd                       sonarqube-1-4fzzl                               200m (2%)     1 (12%)     1Gi (6%)         3Gi (19%)
-  default                    glusterblock-registry-provisioner-dc-1-drzr5    0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  default                    glusterfs-registry-m4cpg                        100m (1%)     0 (0%)      100Mi (0%)       0 (0%)
-  default                    heketi-registry-1-28mq6                         0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       email-2-8lkf5                                   0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-infra            hawkular-cassandra-1-7fjzj                      0 (0%)        0 (0%)      1G (6%)          2G (12%)
-  openshift-infra            heapster-2lv95                                  0 (0%)        0 (0%)      937500k (5%)     3750M (22%)
-  openshift-node             sync-b282k                                      0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-sdn              ovs-m2p6w                                       100m (1%)     200m (2%)   300Mi (1%)       400Mi (2%)
-  openshift-sdn              sdn-2pphr                                       100m (1%)     0 (0%)      200Mi (1%)       0 (0%)
-Allocated resources:
-  (Total limits may be over 100 percent, i.e., overcommitted.)
-  CPU Requests  CPU Limits   Memory Requests   Memory Limits
-  ------------  ----------   ---------------   -------------
-  500m (6%)     1200m (15%)  3640387424 (21%)  9390655872 (56%)
-Events:         <none>
-```
-
-```
-[okd@master ~]$ oc describe node node2
-Name:               node2
-Roles:              compute
-Labels:             beta.kubernetes.io/arch=amd64
-                    beta.kubernetes.io/os=linux
-                    glusterfs=registry-host
-                    kubernetes.io/hostname=node2
-                    node-role.kubernetes.io/compute=true
-Annotations:        volumes.kubernetes.io/controller-managed-attach-detach=true
-CreationTimestamp:  Tue, 02 Oct 2018 16:18:08 -0300
-Taints:             <none>
-Unschedulable:      false
-Conditions:
-  Type             Status  LastHeartbeatTime                 LastTransitionTime                Reason                       Message
-  ----             ------  -----------------                 ------------------                ------                       -------
-  OutOfDisk        False   Mon, 22 Oct 2018 11:43:50 -0300   Mon, 15 Oct 2018 15:18:42 -0300   KubeletHasSufficientDisk     kubelet has sufficient disk space available
-  MemoryPressure   False   Mon, 22 Oct 2018 11:43:50 -0300   Mon, 15 Oct 2018 15:18:42 -0300   KubeletHasSufficientMemory   kubelet has sufficient memory available
-  DiskPressure     False   Mon, 22 Oct 2018 11:43:50 -0300   Mon, 15 Oct 2018 15:18:42 -0300   KubeletHasNoDiskPressure     kubelet has no disk pressure
-  PIDPressure      False   Mon, 22 Oct 2018 11:43:50 -0300   Tue, 02 Oct 2018 16:18:08 -0300   KubeletHasSufficientPID      kubelet has sufficient PID available
-  Ready            True    Mon, 22 Oct 2018 11:43:50 -0300   Mon, 15 Oct 2018 15:18:52 -0300   KubeletReady                 kubelet is posting ready status
-Addresses:
-  InternalIP:  10.211.55.102
-  Hostname:    node2
-Capacity:
- cpu:            8
- hugepages-1Gi:  0
- hugepages-2Mi:  0
- memory:         16266716Ki
- pods:           250
-Allocatable:
- cpu:            8
- hugepages-1Gi:  0
- hugepages-2Mi:  0
- memory:         16164316Ki
- pods:           250
-System Info:
- Machine ID:                 2cbbd2d42edc443e974f74617846910c
- System UUID:                423A1D86-902F-872E-D52F-2FC14522DC47
- Boot ID:                    19b472da-ea8d-4b52-95fc-e39bbf88a0d3
- Kernel Version:             3.10.0-862.14.4.el7.x86_64
- OS Image:                   CentOS Linux 7 (Core)
- Operating System:           linux
- Architecture:               amd64
- Container Runtime Version:  docker://1.13.1
- Kubelet Version:            v1.10.0+b81c8f8
- Kube-Proxy Version:         v1.10.0+b81c8f8
-ExternalID:                  node2
-Non-terminated Pods:         (14 in total)
-  Namespace                  Name                           CPU Requests  CPU Limits  Memory Requests  Memory Limits
-  ---------                  ----                           ------------  ----------  ---------------  -------------
-  cicd                       jenkins-2-lvlz5                0 (0%)        0 (0%)      5Mi (0%)         5Gi (32%)
-  default                    glusterfs-registry-czplt       100m (1%)     0 (0%)      100Mi (0%)       0 (0%)
-  stage                       file-upload-1-tqsqw            0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       juris-5-8bp2k                  0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       juris-front-5-pv6qp            0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       keycloak-1-bnwjw               0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       keycloak-postgresql-1-4xqsv    200m (2%)     300m (3%)   512Mi (3%)       512Mi (3%)
-  stage                       localizacao-3-fx9t5            0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       ocb-admin-server-1-r87wh       0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       ocb-config-server-11-2xbmp     0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  stage                       ramo-5-ksjr9                   0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-node             sync-rwlkq                     0 (0%)        0 (0%)      0 (0%)           0 (0%)
-  openshift-sdn              ovs-xg4t5                      100m (1%)     200m (2%)   300Mi (1%)       400Mi (2%)
-  openshift-sdn              sdn-82wcw                      100m (1%)     0 (0%)      200Mi (1%)       0 (0%)
-Allocated resources:
-  (Total limits may be over 100 percent, i.e., overcommitted.)
-  CPU Requests  CPU Limits  Memory Requests  Memory Limits
-  ------------  ----------  ---------------  -------------
-  500m (6%)     500m (6%)   1117Mi (7%)      6032Mi (38%)
-Events:         <none>
-```
-
-### View PODs of a specific project
-
-```
-[okd@master ~]$ oc get pods -n stage -o wide
-```
-
-```
-[okd@master ~]$ oc get pods -n cicd
-NAME                        READY     STATUS      RESTARTS   AGE
-cicd-demo-installer-vx8jq   0/1       Completed   0          6d
-jenkins-2-lvlz5             1/1       Running     0          3d
-sonarqube-1-4fzzl           1/1       Running     2          6d
-```
-
-### View status of a specific POD
-```
-[okd@master ~]$ oc describe pod jenkins-2-lvlz5
-Name:           jenkins-2-lvlz5
-Namespace:      cicd
-Node:           node2/10.1.0.146
-Start Time:     Thu, 18 Oct 2018 14:34:25 -0300
-Labels:         deployment=jenkins-2
-                deploymentconfig=jenkins
-                name=jenkins
-Annotations:    openshift.io/deployment-config.latest-version=2
-                openshift.io/deployment-config.name=jenkins
-                openshift.io/deployment.name=jenkins-2
-                openshift.io/scc=restricted
-Status:         Running
-IP:             10.129.0.221
-Controlled By:  ReplicationController/jenkins-2
-Containers:
-  jenkins:
-    Container ID:   docker://8e036040e4336002ff116aebfd0b2b34fd2c88f888589f55e874eb805877e769
-    Image:          docker-registry.default.svc:5000/openshift/jenkins@sha256:26d9f54ff135d9a28c5e49a431328c9c49af5235c952ce2b9cb4afafdc336fa7
-    Image ID:       docker-pullable://docker-registry.default.svc:5000/openshift/jenkins@sha256:26d9f54ff135d9a28c5e49a431328c9c49af5235c952ce2b9cb4afafdc336fa7
-    Port:           <none>
-    Host Port:      <none>
-    State:          Running
-      Started:      Thu, 18 Oct 2018 14:34:28 -0300
-    Ready:          True
-    Restart Count:  0
-    Limits:
-      memory:  5Gi
-    Requests:
-      memory:   5Mi
-    Liveness:   http-get http://:8080/login delay=420s timeout=240s period=360s #success=1 #failure=2
-    Readiness:  http-get http://:8080/login delay=3s timeout=240s period=10s #success=1 #failure=3
-    Environment:
-      OPENSHIFT_ENABLE_OAUTH:            true
-      OPENSHIFT_ENABLE_REDIRECT_PROMPT:  true
-      DISABLE_ADMINISTRATIVE_MONITORS:   false
-      KUBERNETES_MASTER:                 https://kubernetes.default:443
-      KUBERNETES_TRUST_CERTIFICATES:     true
-      JENKINS_SERVICE_NAME:              jenkins
-      JNLP_SERVICE_NAME:                 jenkins-jnlp
-    Mounts:
-      /var/lib/jenkins from jenkins-data (rw)
-      /var/run/secrets/kubernetes.io/serviceaccount from jenkins-token-q8zgb (ro)
-Conditions:
-  Type           Status
-  Initialized    True
-  Ready          True
-  PodScheduled   True
-Volumes:
-  jenkins-data:
-    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
-    ClaimName:  jenkins
-    ReadOnly:   false
-  jenkins-token-q8zgb:
-    Type:        Secret (a volume populated by a Secret)
-    SecretName:  jenkins-token-q8zgb
-    Optional:    false
-QoS Class:       Burstable
-Node-Selectors:  node-role.kubernetes.io/compute=true
-Tolerations:     node.kubernetes.io/memory-pressure:NoSchedule
-Events:          <none>
-```
-
-### View services of a projec
-```
-[okd@master ~]$ oc get svc -n stage
-```
-
-```
-[okd@master ~]$ oc get svc -n cicd
-NAME           TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)     AGE
-jenkins        ClusterIP   172.30.110.149   <none>        80/TCP      6d
-jenkins-jnlp   ClusterIP   172.30.46.240    <none>        50000/TCP   6d
-nexus          ClusterIP   172.30.255.202   <none>        8081/TCP    6d
-sonarqube      ClusterIP   172.30.213.26    <none>        9000/TCP    10d
-```
-
-```
-[okd@master ~]$ oc describe svc app -n stage
-```
-
-### View events of a project
-```
-[okd@master ~]$ oc get event -n stage  --watch
-```
-
-```
-[okd@master ~]$ oc get event -n cicd  --watch
-```
+5. Before authentication you see the statistic dashboard:
+![](images/browser_router.png?raw=true)
 
 
-## Useful commands
+Note: For the solution of this access, 2 errors were identified according to the following link for resolution:
 
-### Generate hash to web-console password (/etc/origin/master/htpasswd)
-```
-openssl passwd -apr1 PASS
-```
+https://access.redhat.com/solutions/3447991
+https://bugzilla.redhat.com/show_bug.cgi?id=1663268
 
-### grants privilegies to cluster administration on OKD
-```
-oc adm policy add-cluster-role-to-user cluster-admin USER
-```
-
-### Create a new project
-```
-oc new-project PROJECT
-```
 
 ## Autor
-**Francisco Neto** - *Initial work* - [Profile](https://github.com/netoralves)
+* **Francisco Neto** - *Initial work* - [PurpleBooth](https://github.com/netoralves)
 

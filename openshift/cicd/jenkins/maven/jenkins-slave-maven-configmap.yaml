@@ -22,13 +22,6 @@ data:
         <memory>false</memory>
       </workspaceVolume>
       <volumes />
-      <volumes>
-            <org.csanchez.jenkins.plugins.kubernetes.volumes.PersistentVolumeClaim>
-              <mountPath>/home/jenkins/.m2</mountPath>
-              <claimName>maven-agent-pvc</claimName>
-              <readOnly>false</readOnly>
-            </org.csanchez.jenkins.plugins.kubernetes.volumes.PersistentVolumeClaim>
-          </volumes>
       <containers>
         <org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
           <name>jnlp</name>
@@ -39,9 +32,9 @@ data:
           <command></command>
           <args>${computer.jnlpmac} ${computer.name}</args>
           <ttyEnabled>false</ttyEnabled>
-          <resourceRequestCpu>200m</resourceRequestCpu>
-          <resourceRequestMemory>512Mi</resourceRequestMemory>
-          <resourceLimitCpu>2</resourceLimitCpu>
+          <resourceRequestCpu>1000m</resourceRequestCpu>
+          <resourceRequestMemory>3072Mi</resourceRequestMemory>
+          <resourceLimitCpu>4</resourceLimitCpu>
           <resourceLimitMemory>4Gi</resourceLimitMemory>
           <envVars/>
         </org.csanchez.jenkins.plugins.kubernetes.ContainerTemplate>
@@ -49,4 +42,10 @@ data:
       <envVars/>
       <annotations/>
       <imagePullSecrets/>
+      <envVars>
+        <org.csanchez.jenkins.plugins.kubernetes.PodEnvVar>
+          <key>TZ</key>
+          <value>America/Sao_Paulo</value>
+        </org.csanchez.jenkins.plugins.kubernetes.PodEnvVar>
+      </envVars>
     </org.csanchez.jenkins.plugins.kubernetes.PodTemplate>

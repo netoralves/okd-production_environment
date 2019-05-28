@@ -38,9 +38,9 @@ objects:
                  }
                }
                stages {
-                 stage( 'Make build' ) {
+                 stage( 'build package' ) {
                    steps {
-                     git branch: 'stage', credentialsId: '666d9fae-0115-4085-a8c6-e4a5f12782d7', url: 'http://github/lib.git'
+                     git branch: 'hmlg', credentialsId: '666d9fae-0115-4085-a8c6-e4a5f12782d7', url: '@git@'
                        script {
                          def pom = readMavenPom file: 'pom.xml'
                          version = pom.version
@@ -48,16 +48,16 @@ objects:
                      sh "${mvnCmd} clean install -DskipTests=true"
                    }
                  }  
-                 stage( 'Unit test' ) {
+                 stage( 'Testing' ) {
                    steps {
                      sh "${mvnCmd} test"
                      step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
                    }
                  }  
-                 stage('Code Analyse') {
+                 stage('Code analysis') {
                    steps {
                     script {
-                      sh "${mvnCmd} sonar:sonar -Dsonar.host.url=http://sonar:9000/sonar -DskipTests=true"
+                      sh "${mvnCmd} sonar:sonar -Dsonar.host.url=http://@host_sonar@:9000/sonar -DskipTests=true"
                     }
                   } 
                 }

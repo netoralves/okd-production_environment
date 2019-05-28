@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo yum install -y java-1.8.0-openjdk-devel
+sudo yum install -y java-1.8.0-openjdk-devel wget
 
 #Add JAVA in PATH
 echo "JAVA_HOME=$(readlink -f /usr/bin/java | sed "s:bin/java::")" | sudo tee -a /etc/profile

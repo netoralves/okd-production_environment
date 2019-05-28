@@ -16,13 +16,13 @@ objects:
     labels:
       app: cicd-pipeline
       name: cicd-pipeline
-    name: app-pipeline
+    name: @app@-pipeline
   spec:
     triggers:
       - type: "Generic"
         generic:
           secretReference:
-                name: "app"
+                name: "@app@"
           allowEnv: true
     runPolicy: Serial
     source:
@@ -30,108 +30,206 @@ objects:
     strategy:
       jenkinsPipelineStrategy:
         jenkinsfile: |-
-             def version, mvnCmd = "mvn -s configuration/settings.xml"
-             pipeline {
-               agent {
-                 node {
-                  label 'maven'
-                 }
-               }
-               stages {
-                 stage( 'Make build' ) {
-                   steps {
-                     git branch: 'stage', credentialsId: '666d9fae-0115-4085-a8c6-e4a5f12782d7', url: 'http://github/app.git'
-                       script {
-                         def pom = readMavenPom file: 'pom.xml'
-                         version = pom.version
-                       }
-                     sh "${mvnCmd} clean install -DskipTests=true"
-                   }
-                 }  
-                 stage( 'Unit test' ) {
-                   steps {
-                     sh "${mvnCmd} test"
-                     step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
-                   }
-                 }  
-                 stage('Code Analyse') {
-                   steps {
+          def version, mvnCmd = "mvn -s configuration/settings.xml"
+          pipeline {
+            agent {
+              node {
+                label 'maven'
+              }
+            }
+            stages {
+              stage( 'Building' ) {
+                steps {
+                  git branch: 'hmlg', credentialsId: '4ecac623-a123-4aa6-ad2c-20e80fa36e41', url: '@git@'
                     script {
-                      sh "${mvnCmd} sonar:sonar -Dsonar.host.url=http://10.1.0.247:9000/sonar -DskipTests=true"
+                      def pom = readMavenPom file: 'pom.xml'
+                      version = pom.version
                     }
-                  } 
+                    sh """
+                      ${mvnCmd} versions:set -DnewVersion=${BUILD_ID}`date +%Y%m%d` -f pom.xml
+                      ${mvnCmd} clean install -DskipTests=true
+                    """
                 }
-                stage( 'Create image' ) {
-                  when {
-                    expression {
-                      openshift.withCluster() {
-                        openshift.withProject('stage') {
-                          return !openshift.selector("bc", "app").exists();
-                        }
-                      }
-                    }
-                  }
-                  steps {
-                    script {
-                      openshift.withCluster() {
-                        openshift.withProject('stage') {
-                          openshift.newBuild("--name=app", "--binary=true")
-                        }
-                      } 
-                    } 
+              }  
+              stage( 'Testing code  - JUnit' ) {
+                steps {
+                  sh "${mvnCmd} test"
+                  step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
+                }
+              }  
+              stage( 'Analysing code - Sonar' ) {
+                steps {
+                  script {
+                    sh "${mvnCmd} sonar:sonar -Dsonar.host.url=http://@host_sonar@:9000/sonar -DskipTests=true"
                   }
                 } 
-                stage( 'Image build' ) {
-                  steps {
-                    script {
-                      openshift.withCluster() {
-                        openshift.withProject('stage') {
-                          openshift.selector("bc", "app").startBuild("--from-file='.'", "--wait=true")
-                        }
+              }
+              stage( 'Creating image' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        return !openshift.selector("bc", "@app@").exists();
                       }
                     }
                   }
                 }
-                stage( 'Promote tag' ) {
-                  steps {
-                    script {
-                      openshift.withCluster() {
-                        openshift.withProject('stage') {
-                          openshift.tag("app:latest", "app:stage")
-                        }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.newBuild("--name=@app@", "--binary=true")
+                      }
+                    } 
+                  } 
+                }
+              } 
+              stage( 'Deploy build' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.selector("bc", "@app@").startBuild("--from-file='.'", "--wait=true")
                       }
                     }
                   }
                 }
-                stage( 'Deploy' ) {
-                  when {
-                    expression {
-                      openshift.withCluster() {
-                        openshift.withProject('stage') {
-                          return !openshift.selector('dc', 'app').exists()
-                        }
+              }
+              stage( 'Promote tag' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.tag("@app@:latest", "@app@:hmlg")
                       }
                     }
                   }
-                  steps {
-                    script {
-                      openshift.withCluster() {
-                        openshift.withProject('stage') {
-                          openshift.newApp('app:stage')
-                          sh "oc create service clusterip app --tcp=8080:8080 -n stage"
-                          sh "oc expose svc app --hostname=URL_DO_FRONTEND --path=/app -n stage"
-                        }
-                       }
+                }
+              }
+              stage( 'Deploy App' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        return !openshift.selector('dc', '@app@').exists()
                       }
-                     }
                     }
-                   }
-                 }
+                  }
+                }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('hmlg') {
+                        openshift.newApp('@app@:hmlg')
+                        sh """
+                          oc create service clusterip @app@ --tcp=8080:8080 -n hmlg
+                          oc expose svc @app@ -n hmlg
+                        """
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Promote to PRD?' ) {
+                steps {
+                  timeout(time:240, unit:'MINUTES') {
+                    input message: "Promote to PRD?", ok: "Promote"
+                  }
+                }
+              }
+              stage( 'Execute merge - branch master' ) {
+                steps {
+                  withCredentials([string(credentialsId: '41b1843b-e350-4ab8-8cb4-456c7965c1ef', variable: 'PW1')]){
+                    sh '''
+                      git clean -fd
+                      git checkout -f master
+                      git pull @git@ master
+                      git tag ${BUILD_ID}`date +%Y%m%d`
+                      set +e
+                      git push @git@ ${BUILD_ID}`date +%Y%m%d`
+                      git merge hmlg
+                      sed -i "s/hmlg/prd/" Dockerfile
+                      git add .
+                      git commit -m "Update Docker to PRD"
+                      git push @git@ master
+                    '''
+                  }
+                }
+              }
+              stage( 'Create image - PRD' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        return !openshift.selector("bc", "@app@").exists();
+                      }
+                    }
+                  }
+                }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        openshift.newBuild("--name=@app@", "--binary=true")
+                      }
+                    } 
+                  } 
+                }
+              } 
+              stage( 'Deploy build - PRD' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        sh "sed -i 's/hmlg/prd/' Dockerfile"
+                        openshift.selector("bc", "@app@").startBuild("--from-file='.'", "--wait=true")
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Promote tag - PRD' ) {
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        openshift.tag("@app@:latest", "@app@:prd")
+                      }
+                    }
+                  }
+                }
+              }
+              stage( 'Deploy app - PRD' ) {
+                when {
+                  expression {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        return !openshift.selector('dc', '@app@').exists()
+                      }
+                    }
+                  }
+                }
+                steps {
+                  script {
+                    openshift.withCluster() {
+                      openshift.withProject('prd') {
+                        openshift.newApp('@app@:prd')
+                        sh """
+                          oc create service clusterip @app@ --tcp=8080:8080 -n prd
+                          oc expose svc @app@ -n prd
+                        """
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         type: JenkinsPipeline
 - kind: Secret
   apiVersion: v1
   metadata:
-    name: app
+    name: @app@
     creationTimestamp:
   data:
     WebHookSecretKey: YmQxZDI1YzZjZGNmZWM3ZA==
